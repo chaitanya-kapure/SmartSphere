@@ -1,0 +1,16 @@
+{
+  "name": "smart-city-pro",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev"
+  },
+  "dependencies": {
+    "firebase": "^12.12.1",
+    "mongoose": "^9.5.0",
+    "next": "latest",
+    "nodemailer": "^8.0.5",
+    "react": "latest",
+    "react-dom": "latest"
+  }
+}
