@@ -3,6 +3,8 @@ const ComplaintHistory = require("../models/ComplaintHistory");
 const Counter = require("../models/Counter");
 const User = require("../models/User");
 const { AppError } = require("../utils/errors");
+const notificationService = require("./notificationService");
+const { getIO } = require("../socket");
 
 const TRANSITIONS = {
   pending: ["assigned", "rejected"],
@@ -32,6 +34,15 @@ class ComplaintService {
     });
 
     await this._recordHistory(complaint._id, null, "pending", userId, "Complaint submitted");
+
+    try {
+      const io = getIO();
+      io.to("role:dept_head").to("role:super_admin").emit("complaint_created", {
+        complaintId: complaint.complaintId,
+        title: complaint.title,
+        status: complaint.status,
+      });
+    } catch {}
 
     return complaint;
   }
@@ -153,6 +164,22 @@ class ComplaintService {
       `Assigned to ${worker.name}`
     );
 
+    try {
+      const io = getIO();
+      io.to(`user:${workerId}`).emit("worker_assigned", {
+        complaintId: complaint.complaintId,
+        title: complaint.title,
+      });
+    } catch {}
+
+    await notificationService.create({
+      recipient: workerId,
+      type: "assignment",
+      title: "New Task Assigned",
+      message: `Complaint ${complaint.complaintId}: ${complaint.title}`,
+      complaint: complaint._id,
+    });
+
     return complaint;
   }
 
@@ -186,6 +213,40 @@ class ComplaintService {
       user.id,
       remark || `Status changed to ${newStatus}`
     );
+
+    try {
+      const io = getIO();
+      io.to(`user:${complaint.citizen}`).emit("status_changed", {
+        complaintId: complaint.complaintId,
+        previousStatus,
+        newStatus,
+        remark,
+      });
+
+      if (newStatus === "verification" && complaint.department) {
+        io.to(`department:${complaint.department}`).emit("verification_requested", {
+          complaintId: complaint.complaintId,
+        });
+      }
+    } catch {}
+
+    await notificationService.create({
+      recipient: complaint.citizen,
+      type: "status_change",
+      title: `Complaint ${newStatus.replace("_", " ")}`,
+      message: `Complaint ${complaint.complaintId} is now ${newStatus.replace("_", " ")}`,
+      complaint: complaint._id,
+    });
+
+    if (newStatus === "resolved") {
+      await notificationService.create({
+        recipient: complaint.citizen,
+        type: "feedback_request",
+        title: "Complaint Resolved — Share Feedback",
+        message: `Your complaint ${complaint.complaintId} has been resolved. Please rate your experience.`,
+        complaint: complaint._id,
+      });
+    }
 
     return complaint;
   }

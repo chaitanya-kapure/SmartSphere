@@ -1,10 +1,12 @@
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
+const http = require("http");
 const rateLimit = require("express-rate-limit");
 const connectDB = require("./config/db");
 const config = require("./config/env");
 const { AppError } = require("./utils/errors");
+const socketInit = require("./socket");
 
 const app = express();
 
@@ -29,6 +31,7 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/complaints", require("./routes/complaints"));
 app.use("/api/uploads", require("./routes/uploads"));
 app.use("/api/maps", require("./routes/maps"));
+app.use("/api/notifications", require("./routes/notifications"));
 
 app.all("*", (req, res) => {
   res.status(404).json({ error: `Route ${req.originalUrl} not found` });
@@ -54,7 +57,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(config.port, () => {
+const server = http.createServer(app);
+socketInit.init(server);
+
+server.listen(config.port, () => {
   console.log(`Server running on port ${config.port}`);
 });
 
