@@ -1,0 +1,260 @@
+const Complaint = require("../models/Complaint");
+const ComplaintHistory = require("../models/ComplaintHistory");
+const Counter = require("../models/Counter");
+const User = require("../models/User");
+const { AppError } = require("../utils/errors");
+
+const TRANSITIONS = {
+  pending: ["assigned", "rejected"],
+  assigned: ["in_progress", "rejected"],
+  in_progress: ["verification", "rejected"],
+  verification: ["resolved", "rejected"],
+  resolved: ["reopened"],
+  reopened: ["assigned"],
+};
+
+const SLA_HOURS = 48;
+
+class ComplaintService {
+  async create(userId, data) {
+    const complaintId = await this._generateComplaintId();
+
+    const complaint = await Complaint.create({
+      complaintId,
+      citizen: userId,
+      title: data.title,
+      description: data.description,
+      category: data.category || null,
+      location: data.location || { type: "Point", coordinates: [0, 0] },
+      address: data.address || "",
+      images: data.images || [],
+      slaDeadline: new Date(Date.now() + SLA_HOURS * 60 * 60 * 1000),
+    });
+
+    await this._recordHistory(complaint._id, null, "pending", userId, "Complaint submitted");
+
+    return complaint;
+  }
+
+  async list(user, query = {}) {
+    const filter = { isDeleted: false };
+
+    if (user.role === "citizen") {
+      filter.citizen = user.id;
+    } else if (user.role === "worker") {
+      filter.assignedWorker = user.id;
+    } else if (user.role === "dept_head") {
+      const userDoc = await User.findById(user.id);
+      if (!userDoc.department) {
+        return [];
+      }
+      filter.department = userDoc.department;
+    }
+
+    if (query.status) filter.status = query.status;
+    if (query.priority) filter.priority = query.priority;
+    if (query.department) filter.department = query.department;
+
+    const complaints = await Complaint.find(filter)
+      .populate("citizen", "name email")
+      .populate("assignedWorker", "name email")
+      .populate("department", "name code")
+      .sort({ createdAt: -1 });
+
+    return complaints;
+  }
+
+  async getById(user, complaintId) {
+    const complaint = await Complaint.findById(complaintId)
+      .populate("citizen", "name email")
+      .populate("assignedWorker", "name email")
+      .populate("department", "name code");
+
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    this._checkAccess(user, complaint);
+
+    return complaint;
+  }
+
+  async update(user, complaintId, data) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    this._checkOwnerOrAdmin(user, complaint);
+
+    const allowedFields = ["title", "description", "category", "address"];
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        complaint[field] = data[field];
+      }
+    }
+
+    if (data.location) {
+      complaint.location = data.location;
+    }
+
+    await complaint.save();
+    return complaint;
+  }
+
+  async remove(user, complaintId) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    this._checkOwnerOrAdmin(user, complaint);
+
+    if (user.role === "citizen" && complaint.status !== "pending") {
+      throw new AppError(
+        "You can only delete complaints in pending status",
+        403
+      );
+    }
+
+    complaint.isDeleted = true;
+    await complaint.save();
+  }
+
+  async assign(user, complaintId, workerId) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    if (complaint.status !== "pending" && complaint.status !== "reopened") {
+      throw new AppError(
+        "Complaint must be in pending or reopened status to assign",
+        400
+      );
+    }
+
+    const worker = await User.findById(workerId);
+    if (!worker || worker.role !== "worker") {
+      throw new AppError("Worker not found or invalid role", 400);
+    }
+
+    complaint.assignedWorker = workerId;
+    complaint.assignedBy = user.id;
+    complaint.assignedAt = new Date();
+    complaint.status = "assigned";
+    await complaint.save();
+
+    await this._recordHistory(
+      complaint._id,
+      "pending",
+      "assigned",
+      user.id,
+      `Assigned to ${worker.name}`
+    );
+
+    return complaint;
+  }
+
+  async updateStatus(user, complaintId, newStatus, remark) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    this._validateTransition(complaint.status, newStatus);
+
+    const previousStatus = complaint.status;
+    complaint.status = newStatus;
+
+    if (newStatus === "resolved") {
+      complaint.resolvedAt = new Date();
+      const diffMs = complaint.resolvedAt - complaint.createdAt;
+      complaint.resolutionTimeHours = Math.round(diffMs / (1000 * 60 * 60));
+    }
+
+    await complaint.save();
+
+    await this._recordHistory(
+      complaint._id,
+      previousStatus,
+      newStatus,
+      user.id,
+      remark || `Status changed to ${newStatus}`
+    );
+
+    return complaint;
+  }
+
+  async timeline(complaintId) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    const history = await ComplaintHistory.find({ complaint: complaintId })
+      .populate("changedBy", "name role")
+      .sort({ createdAt: 1 });
+
+    return history;
+  }
+
+  _validateTransition(current, next) {
+    const allowed = TRANSITIONS[current];
+    if (!allowed) {
+      throw new AppError(`Invalid current status: ${current}`, 400);
+    }
+    if (!allowed.includes(next)) {
+      throw new AppError(
+        `Cannot transition from "${current}" to "${next}". Allowed: ${allowed.join(", ")}`,
+        400
+      );
+    }
+  }
+
+  async _generateComplaintId() {
+    const year = new Date().getFullYear().toString();
+    const counter = await Counter.findByIdAndUpdate(
+      "complaintId",
+      { $inc: { seq: 1 }, $setOnInsert: { year } },
+      { upsert: true, new: true }
+    );
+    return `CMP-${year}-${String(counter.seq).padStart(4, "0")}`;
+  }
+
+  async _recordHistory(complaintId, previousStatus, newStatus, changedBy, remark) {
+    await ComplaintHistory.create({
+      complaint: complaintId,
+      previousStatus,
+      newStatus,
+      changedBy,
+      remark,
+    });
+  }
+
+  _checkAccess(user, complaint) {
+    if (user.role === "super_admin") return;
+    if (
+      user.role === "citizen" &&
+      complaint.citizen.toString() === user.id
+    ) {
+      return;
+    }
+    if (
+      user.role === "worker" &&
+      complaint.assignedWorker &&
+      complaint.assignedWorker.toString() === user.id
+    ) {
+      return;
+    }
+    throw new AppError("You do not have access to this complaint", 403);
+  }
+
+  _checkOwnerOrAdmin(user, complaint) {
+    if (user.role === "super_admin") return;
+    if (complaint.citizen.toString() === user.id) return;
+    throw new AppError("You can only modify your own complaints", 403);
+  }
+}
+
+module.exports = new ComplaintService();

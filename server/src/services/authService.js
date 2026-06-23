@@ -77,7 +77,11 @@ class AuthService {
 
   _generateAccessToken(user) {
     return jwt.sign(
-      { sub: user._id.toString(), role: user.role },
+      {
+        sub: user._id.toString(),
+        role: user.role,
+        department: user.department ? user.department.toString() : null,
+      },
       config.jwtSecret,
       { expiresIn: config.jwtExpiry }
     );

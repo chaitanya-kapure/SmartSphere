@@ -26,7 +26,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/auth", require("./routes/auth"));
-app.use("/api/demo", require("./routes/demo"));
+app.use("/api/complaints", require("./routes/complaints"));
 
 app.all("*", (req, res) => {
   res.status(404).json({ error: `Route ${req.originalUrl} not found` });
@@ -35,6 +35,15 @@ app.all("*", (req, res) => {
 app.use((err, req, res, next) => {
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({ error: err.message });
+  }
+  if (err.name === "CastError") {
+    return res.status(400).json({ error: "Invalid ID format" });
+  }
+  if (err.name === "ValidationError") {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err.code === 11000) {
+    return res.status(409).json({ error: "Duplicate value" });
   }
   console.error("Unhandled error:", err);
   res.status(500).json({ error: "Internal server error" });
