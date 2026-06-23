@@ -111,13 +111,14 @@ const complaintSchema = new mongoose.Schema(
     priority: {
       type: String,
       enum: {
-        values: ["low", "medium", "high"],
+        values: ["low", "medium", "high", "critical"],
         message: "{VALUE} is not a valid priority",
       },
       default: "medium",
     },
     aiClassification: {
       category: { type: String, default: null },
+      department: { type: String, default: null },
       priority: { type: String, default: null },
       confidence: { type: Number, default: null },
       isDuplicate: { type: Boolean, default: false },
@@ -126,7 +127,9 @@ const complaintSchema = new mongoose.Schema(
         ref: "Complaint",
         default: null,
       },
+      duplicateConfidence: { type: Number, default: null },
     },
+    aiSummary: { type: String, default: null },
     isDuplicate: {
       type: Boolean,
       default: false,

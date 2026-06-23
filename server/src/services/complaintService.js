@@ -2,9 +2,14 @@ const Complaint = require("../models/Complaint");
 const ComplaintHistory = require("../models/ComplaintHistory");
 const Counter = require("../models/Counter");
 const User = require("../models/User");
+const Department = require("../models/Department");
 const { AppError } = require("../utils/errors");
 const notificationService = require("./notificationService");
 const { getIO } = require("../socket");
+const classificationService = require("./ai/classificationService");
+const priorityService = require("./ai/priorityService");
+const duplicateDetectionService = require("./ai/duplicateDetectionService");
+const summarizationService = require("./ai/summarizationService");
 
 const TRANSITIONS = {
   pending: ["assigned", "rejected"],
@@ -21,16 +26,74 @@ class ComplaintService {
   async create(userId, data) {
     const complaintId = await this._generateComplaintId();
 
+    const [classification, priority, duplicate, summary] = await Promise.allSettled([
+      classificationService.classify(data.title, data.description),
+      priorityService.predict(data.title, data.description),
+      duplicateDetectionService.check(data.title, data.description),
+      summarizationService.summarize(data.title, data.description),
+    ]);
+
+    const aiData = {};
+
+    if (classification.status === "fulfilled") {
+      aiData["aiClassification.category"] = classification.value.category;
+      aiData["aiClassification.department"] = classification.value.department;
+      aiData["aiClassification.confidence"] = classification.value.confidence;
+      aiData.category = classification.value.category;
+
+      if (classification.value.department && classification.value.confidence >= 0.7) {
+        const dept = await Department.findOne({
+          name: { $regex: new RegExp(`^${classification.value.department}$`, "i") },
+        }).select("_id");
+        if (dept) {
+          aiData.department = dept._id;
+        }
+      }
+    }
+
+    if (priority.status === "fulfilled") {
+      aiData["aiClassification.priority"] = priority.value.priority;
+      aiData.priority = priority.value.priority;
+    }
+
+    if (duplicate.status === "fulfilled") {
+      aiData["aiClassification.isDuplicate"] = duplicate.value.isDuplicate;
+      aiData.isDuplicate = duplicate.value.isDuplicate;
+      if (duplicate.value.duplicateOf) {
+        aiData["aiClassification.duplicateOf"] = duplicate.value.duplicateOf;
+        aiData.duplicateOf = duplicate.value.duplicateOf;
+      }
+      aiData["aiClassification.duplicateConfidence"] = duplicate.value.confidence;
+    }
+
+    if (summary.status === "fulfilled") {
+      aiData.aiSummary = summary.value.summary;
+    }
+
     const complaint = await Complaint.create({
       complaintId,
       citizen: userId,
       title: data.title,
       description: data.description,
-      category: data.category || null,
       location: data.location || { type: "Point", coordinates: [0, 0] },
       address: data.address || "",
       images: data.images || [],
       slaDeadline: new Date(Date.now() + SLA_HOURS * 60 * 60 * 1000),
+      ...(aiData.category ? { category: aiData.category } : {}),
+      ...(aiData.department ? { department: aiData.department } : {}),
+      ...(aiData.priority ? { priority: aiData.priority } : {}),
+      ...(aiData.isDuplicate !== undefined ? { isDuplicate: aiData.isDuplicate } : {}),
+      ...(aiData.duplicateOf ? { duplicateOf: aiData.duplicateOf } : {}),
+      ...(aiData.aiSummary ? { aiSummary: aiData.aiSummary } : {}),
+      aiClassification: {
+        category: aiData["aiClassification.category"] || null,
+        department: aiData["aiClassification.department"] || null,
+        priority: aiData["aiClassification.priority"] || null,
+        confidence: aiData["aiClassification.confidence"] ?? null,
+        isDuplicate: aiData["aiClassification.isDuplicate"] ?? false,
+        duplicateOf: aiData["aiClassification.duplicateOf"] || null,
+        duplicateConfidence: aiData["aiClassification.duplicateConfidence"] ?? null,
+      },
     });
 
     await this._recordHistory(complaint._id, null, "pending", userId, "Complaint submitted");
@@ -41,6 +104,9 @@ class ComplaintService {
         complaintId: complaint.complaintId,
         title: complaint.title,
         status: complaint.status,
+        category: complaint.category,
+        priority: complaint.priority,
+        isDuplicate: complaint.isDuplicate,
       });
     } catch {}
 
