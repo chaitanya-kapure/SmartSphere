@@ -28,6 +28,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/complaints", require("./routes/complaints"));
 app.use("/api/uploads", require("./routes/uploads"));
+app.use("/api/maps", require("./routes/maps"));
 
 app.all("*", (req, res) => {
   res.status(404).json({ error: `Route ${req.originalUrl} not found` });
