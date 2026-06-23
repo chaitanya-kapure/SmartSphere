@@ -71,8 +71,12 @@ class AuthService {
       throw new AppError("User not found", 401);
     }
 
+    await RefreshToken.findOneAndDelete({ token: refreshTokenValue });
+
     const accessToken = this._generateAccessToken(user);
-    return { accessToken };
+    const refreshToken = await this._generateRefreshToken(user);
+
+    return { accessToken, refreshToken };
   }
 
   _generateAccessToken(user) {

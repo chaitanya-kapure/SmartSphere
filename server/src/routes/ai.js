@@ -1,10 +1,13 @@
 const router = require("express").Router();
 const { authenticate } = require("../middleware/auth");
 const { authorize } = require("../middleware/roles");
+const validate = require("../middleware/validate");
+const { classifyRules, overrideRules } = require("../validators/aiValidators");
 const insightsService = require("../services/ai/insightsService");
 const classificationService = require("../services/ai/classificationService");
 const priorityService = require("../services/ai/priorityService");
 const duplicateDetectionService = require("../services/ai/duplicateDetectionService");
+const summarizationService = require("../services/ai/summarizationService");
 const Complaint = require("../models/Complaint");
 
 router.use(authenticate);
@@ -18,13 +21,13 @@ router.get("/insights", authorize("super_admin"), async (req, res, next) => {
   }
 });
 
-router.post("/classify", async (req, res, next) => {
+router.post("/classify", classifyRules, validate, async (req, res, next) => {
   try {
     const { title, description } = req.body;
     const [classification, priority, summary] = await Promise.allSettled([
       classificationService.classify(title, description),
       priorityService.predict(title, description),
-      require("../services/ai/summarizationService").summarize(title, description),
+      summarizationService.summarize(title, description),
     ]);
 
     res.json({
@@ -37,7 +40,7 @@ router.post("/classify", async (req, res, next) => {
   }
 });
 
-router.post("/detect-duplicate", async (req, res, next) => {
+router.post("/detect-duplicate", classifyRules, validate, async (req, res, next) => {
   try {
     const { title, description } = req.body;
     const result = await duplicateDetectionService.check(title, description);
@@ -47,12 +50,16 @@ router.post("/detect-duplicate", async (req, res, next) => {
   }
 });
 
-router.patch("/override/:id", authorize("super_admin", "dept_head"), async (req, res, next) => {
+router.patch("/override/:id", authorize("super_admin", "dept_head"), overrideRules, validate, async (req, res, next) => {
   try {
     const { category, priority, department, aiSummary } = req.body;
     const complaint = await Complaint.findById(req.params.id);
     if (!complaint || complaint.isDeleted) {
-      return res.status(404).json({ error: "Complaint not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+        errorCode: "NOT_FOUND",
+      });
     }
 
     if (category !== undefined) complaint.category = category;
