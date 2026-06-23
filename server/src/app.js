@@ -32,6 +32,7 @@ app.use("/api/complaints", require("./routes/complaints"));
 app.use("/api/uploads", require("./routes/uploads"));
 app.use("/api/maps", require("./routes/maps"));
 app.use("/api/notifications", require("./routes/notifications"));
+app.use("/api/analytics", require("./routes/analytics"));
 
 app.all("*", (req, res) => {
   res.status(404).json({ error: `Route ${req.originalUrl} not found` });

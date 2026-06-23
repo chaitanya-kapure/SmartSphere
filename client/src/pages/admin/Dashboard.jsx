@@ -1,11 +1,31 @@
 import React, { useEffect, useState } from "react";
-import { getComplaints } from "../../services/complaintService";
 import ComplaintMap from "../../components/maps/ComplaintMap";
 import MapFilters from "../../components/maps/MapFilters";
+import StatsGrid from "../../components/charts/StatsGrid";
+import MonthlyTrendChart from "../../components/charts/MonthlyTrendChart";
+import DeptDistribution from "../../components/charts/DeptDistribution";
+import StatusPieChart from "../../components/charts/StatusPieChart";
+import PriorityPieChart from "../../components/charts/PriorityPieChart";
+import WorkerPerfChart from "../../components/charts/WorkerPerfChart";
+import { getComplaints } from "../../services/complaintService";
+import {
+  getStats,
+  getMonthlyTrend,
+  getDepartmentDistribution,
+  getStatusDistribution,
+  getPriorityDistribution,
+  getWorkerPerformance,
+} from "../../services/analyticsService";
 
 export default function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [filters, setFilters] = useState({});
+  const [stats, setStats] = useState(null);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
+  const [deptDist, setDeptDist] = useState([]);
+  const [statusDist, setStatusDist] = useState([]);
+  const [priorityDist, setPriorityDist] = useState([]);
+  const [workerPerf, setWorkerPerf] = useState([]);
 
   const load = async (f = {}) => {
     try {
@@ -16,45 +36,67 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadAnalytics = async () => {
+    try {
+      const [s, m, d, st, p, w] = await Promise.all([
+        getStats(),
+        getMonthlyTrend(),
+        getDepartmentDistribution(),
+        getStatusDistribution(),
+        getPriorityDistribution(),
+        getWorkerPerformance(),
+      ]);
+      setStats(s.data);
+      setMonthlyTrend(m.data);
+      setDeptDist(d.data);
+      setStatusDist(st.data);
+      setPriorityDist(p.data);
+      setWorkerPerf(w.data);
+    } catch {
+      // analytics silently fail
+    }
+  };
+
   useEffect(() => {
     load();
+    loadAnalytics();
   }, []);
-
-  const stats = {
-    total: complaints.length,
-    pending: complaints.filter((c) => c.status === "pending").length,
-    assigned: complaints.filter((c) => c.status === "assigned").length,
-    inProgress: complaints.filter((c) => c.status === "in_progress").length,
-    resolved: complaints.filter((c) => c.status === "resolved").length,
-  };
 
   return (
     <div>
       <h2 style={{ marginBottom: 16 }}>Admin Dashboard</h2>
 
+      <StatsGrid stats={stats} />
+
       <div
-        className="grid-2"
-        style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+          gap: 16,
+          marginBottom: 20,
+        }}
       >
-        <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 28, fontWeight: "bold", color: "#6366f1" }}>{stats.total}</p>
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>Total</p>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 28, fontWeight: "bold", color: "#fb923c" }}>{stats.pending}</p>
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>Pending</p>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 28, fontWeight: "bold", color: "#3b82f6" }}>{stats.assigned}</p>
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>Assigned</p>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 28, fontWeight: "bold", color: "#22c55e" }}>{stats.resolved}</p>
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>Resolved</p>
-        </div>
+        <MonthlyTrendChart data={monthlyTrend} />
+        <DeptDistribution data={deptDist} />
       </div>
 
-      <ComplaintMap complaints={complaints} height={450} />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
+        <StatusPieChart data={statusDist} />
+        <PriorityPieChart data={priorityDist} />
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <WorkerPerfChart data={workerPerf} />
+      </div>
+
+      <ComplaintMap complaints={complaints} height={400} />
       <MapFilters filters={filters} onChange={setFilters} onApply={() => load(filters)} />
     </div>
   );
