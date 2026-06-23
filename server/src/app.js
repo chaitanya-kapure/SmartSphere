@@ -12,7 +12,7 @@ connectDB();
 
 app.use(helmet());
 app.use(cors({ origin: config.clientUrl, credentials: true }));
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "1mb" }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -27,6 +27,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/complaints", require("./routes/complaints"));
+app.use("/api/uploads", require("./routes/uploads"));
 
 app.all("*", (req, res) => {
   res.status(404).json({ error: `Route ${req.originalUrl} not found` });
@@ -41,6 +42,9 @@ app.use((err, req, res, next) => {
   }
   if (err.name === "ValidationError") {
     return res.status(400).json({ error: err.message });
+  }
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ error: "File too large (max 5MB)" });
   }
   if (err.code === 11000) {
     return res.status(409).json({ error: "Duplicate value" });

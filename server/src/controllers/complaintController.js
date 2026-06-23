@@ -68,7 +68,8 @@ exports.updateStatus = async (req, res, next) => {
       req.user,
       req.params.id,
       req.body.status,
-      req.body.remark
+      req.body.remark,
+      req.body.proofImages
     );
     res.json(complaint);
   } catch (err) {

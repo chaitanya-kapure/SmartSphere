@@ -51,6 +51,11 @@ const updateStatusRules = [
     .withMessage("Invalid status value"),
 
   body("remark").optional().trim().isLength({ max: 500 }),
+
+  body("proofImages")
+    .optional()
+    .isArray({ max: 5 })
+    .withMessage("Maximum 5 proof images allowed"),
 ];
 
 const assignRules = [

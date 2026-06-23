@@ -65,11 +65,31 @@ const complaintSchema = new mongoose.Schema(
       default: "",
     },
     images: {
-      type: [String],
+      type: [
+        {
+          url: { type: String, required: true },
+          publicId: { type: String, required: true },
+          uploadedAt: { type: Date, default: Date.now },
+        },
+      ],
       default: [],
       validate: {
         validator: (v) => v.length <= 5,
         message: "Maximum 5 images allowed",
+      },
+    },
+    proofImages: {
+      type: [
+        {
+          url: { type: String, required: true },
+          publicId: { type: String, required: true },
+          uploadedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+      validate: {
+        validator: (v) => v.length <= 5,
+        message: "Maximum 5 proof images allowed",
       },
     },
     status: {

@@ -156,7 +156,7 @@ class ComplaintService {
     return complaint;
   }
 
-  async updateStatus(user, complaintId, newStatus, remark) {
+  async updateStatus(user, complaintId, newStatus, remark, proofImages) {
     const complaint = await Complaint.findById(complaintId);
     if (!complaint || complaint.isDeleted) {
       throw new AppError("Complaint not found", 404);
@@ -166,6 +166,10 @@ class ComplaintService {
 
     const previousStatus = complaint.status;
     complaint.status = newStatus;
+
+    if (proofImages && proofImages.length > 0) {
+      complaint.proofImages = proofImages;
+    }
 
     if (newStatus === "resolved") {
       complaint.resolvedAt = new Date();
