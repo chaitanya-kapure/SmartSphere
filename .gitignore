@@ -1,3 +1,10 @@
 node_modules
 .next
 .env.local
+.env
+server/node_modules
+server/.env
+client/node_modules
+client/.env
+client/build/
+server/uploads/
