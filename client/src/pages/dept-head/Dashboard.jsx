@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getComplaints, assignWorker } from "../../services/complaintService";
+import { getDepartmentWorkers } from "../../services/workerService";
 import ComplaintMap from "../../components/maps/ComplaintMap";
 import MapFilters from "../../components/maps/MapFilters";
 import StatsGrid from "../../components/charts/StatsGrid";
@@ -19,7 +20,8 @@ export default function DeptHeadDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [filters, setFilters] = useState({});
   const [assigning, setAssigning] = useState(null);
-  const [workerEmail, setWorkerEmail] = useState("");
+  const [selectedWorker, setSelectedWorker] = useState("");
+  const [workers, setWorkers] = useState([]);
   const [stats, setStats] = useState(null);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [statusDist, setStatusDist] = useState([]);
@@ -58,13 +60,14 @@ export default function DeptHeadDashboard() {
   useEffect(() => {
     load();
     loadAnalytics();
+    getDepartmentWorkers().then(setWorkers).catch(() => {});
   }, []);
 
   const handleAssign = async (complaintId) => {
     try {
-      await assignWorker(complaintId, workerEmail);
+      await assignWorker(complaintId, selectedWorker);
       setAssigning(null);
-      setWorkerEmail("");
+      setSelectedWorker("");
       load();
     } catch (err) {
       alert(err.response?.data?.error || "Assignment failed");
@@ -135,22 +138,32 @@ export default function DeptHeadDashboard() {
                     alignItems: "center",
                   }}
                 >
-                  <input
+                  <select
                     className="input"
-                    style={{ marginBottom: 0, width: 200 }}
-                    placeholder="Worker ID"
-                    value={workerEmail}
-                    onChange={(e) => setWorkerEmail(e.target.value)}
-                  />
+                    style={{ marginBottom: 0, width: 220 }}
+                    value={selectedWorker}
+                    onChange={(e) => setSelectedWorker(e.target.value)}
+                  >
+                    <option value="">Select Worker</option>
+                    {workers.map((w) => (
+                      <option key={w._id} value={w._id}>
+                        {w.name} ({w.email})
+                      </option>
+                    ))}
+                  </select>
                   <button
                     className="btn btn-sm"
                     onClick={() => handleAssign(c._id)}
+                    disabled={!selectedWorker}
                   >
                     Assign
                   </button>
                   <button
                     className="btn btn-sm btn-danger"
-                    onClick={() => setAssigning(null)}
+                    onClick={() => {
+                      setAssigning(null);
+                      setSelectedWorker("");
+                    }}
                   >
                     Cancel
                   </button>

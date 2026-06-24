@@ -66,6 +66,7 @@ app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/analytics", require("./routes/analytics"));
 app.use("/api/ai", require("./routes/ai"));
 app.use("/api/departments", require("./routes/departments"));
+app.use("/api/users", require("./routes/users"));
 
 app.all("*", (req, res) => {
   res.status(404).json({
