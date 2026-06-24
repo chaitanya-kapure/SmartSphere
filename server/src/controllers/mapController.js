@@ -22,9 +22,10 @@ exports.getComplaints = async (req, res, next) => {
     if (req.query.department) filter.department = req.query.department;
 
     const complaints = await Complaint.find(filter)
-      .select("complaintId title status priority location address citizen assignedWorker")
+      .select("complaintId title status priority location address citizen assignedWorker department")
       .populate("citizen", "name")
-      .populate("assignedWorker", "name");
+      .populate("assignedWorker", "name")
+      .populate("department", "name");
 
     res.json(complaints);
   } catch (err) {
@@ -79,12 +80,55 @@ exports.reverseGeocode = async (req, res, next) => {
       response.on("end", () => {
         try {
           const result = JSON.parse(data);
+          const addr = result.address || {};
           res.json({
             displayName: result.display_name || "",
-            address: result.address || {},
+            address: {
+              road: addr.road || "",
+              city: addr.city || addr.town || addr.village || addr.county || "",
+              state: addr.state || "",
+              postcode: addr.postcode || "",
+              country: addr.country || "",
+            },
           });
         } catch {
           res.json({ displayName: "", address: {} });
+        }
+      });
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.searchLocation = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q || !q.trim()) {
+      throw new AppError("Search query is required", 400);
+    }
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`;
+
+    https.get(url, { headers: { "User-Agent": "SmartSphereCity/2.0" } }, (response) => {
+      let data = "";
+      response.on("data", (chunk) => (data += chunk));
+      response.on("end", () => {
+        try {
+          const results = JSON.parse(data);
+          res.json(results.map((r) => ({
+            lat: parseFloat(r.lat),
+            lng: parseFloat(r.lon),
+            displayName: r.display_name,
+            address: {
+              road: r.address?.road || "",
+              city: r.address?.city || r.address?.town || r.address?.village || r.address?.county || "",
+              state: r.address?.state || "",
+              postcode: r.address?.postcode || "",
+            },
+          })));
+        } catch {
+          res.json([]);
         }
       });
     });

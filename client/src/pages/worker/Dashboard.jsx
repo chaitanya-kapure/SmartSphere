@@ -121,6 +121,18 @@ export default function WorkerDashboard() {
             {t.title}
           </p>
 
+          {t.location?.coordinates?.length === 2 && t.location.coordinates[0] !== 0 && (
+            <p style={{ marginTop: 6, marginBottom: 0, fontSize: 12 }}>
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${t.location.coordinates[1]},${t.location.coordinates[0]}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#3b82f6", textDecoration: "none" }}
+              >
+                Navigate ↗
+              </a>
+            </p>
+          )}
           <div
             style={{
               marginTop: 10,

@@ -18,6 +18,8 @@ export const getMapComplaints = (params) =>
 export const getNearby = (params) => api.get("/maps/nearby", { params });
 export const reverseGeocode = (lat, lng) =>
   api.get("/maps/reverse-geocode", { params: { lat, lng } });
+export const searchLocation = (q) =>
+  api.get("/maps/search", { params: { q } });
 
 export const uploadImage = (file, endpoint, complaintId) => {
   const formData = new FormData();

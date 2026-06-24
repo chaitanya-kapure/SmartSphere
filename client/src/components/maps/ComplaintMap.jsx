@@ -104,6 +104,10 @@ export default function ComplaintMap({ complaints = [], height = 500 }) {
                     >
                       {c.status?.toUpperCase()}
                     </span>
+                    <br />
+                    <span style={{ color: "#666", fontSize: 11 }}>
+                      Priority: {c.priority?.toUpperCase()} · {c.department?.name || "No Dept"}
+                    </span>
                     {c.address && (
                       <>
                         <br />

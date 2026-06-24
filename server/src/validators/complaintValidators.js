@@ -18,14 +18,19 @@ const createComplaintRules = [
   body("category").optional().trim(),
 
   body("address").optional().trim(),
+  body("city").optional().trim(),
+  body("state").optional().trim(),
+  body("pincode").optional().trim(),
 
   body("location")
-    .optional()
+    .notEmpty()
+    .withMessage("Location is required")
     .isObject()
     .withMessage("Location must be an object"),
 
   body("location.coordinates")
-    .optional()
+    .notEmpty()
+    .withMessage("Coordinates are required")
     .isArray({ min: 2, max: 2 })
     .withMessage("Coordinates must be [lng, lat]"),
 

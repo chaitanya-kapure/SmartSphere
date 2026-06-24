@@ -64,6 +64,9 @@ const complaintSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    pincode: { type: String, default: "" },
     images: {
       type: [
         {

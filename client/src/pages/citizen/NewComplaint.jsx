@@ -10,6 +10,9 @@ export default function NewComplaint() {
     description: "",
     category: "",
     address: "",
+    city: "",
+    state: "",
+    pincode: "",
   });
   const [location, setLocation] = useState(null);
   const [images, setImages] = useState([]);
@@ -38,9 +41,9 @@ export default function NewComplaint() {
     setUploading(false);
   };
 
-  const handleLocationSelect = ({ lat, lng, address }) => {
+  const handleLocationSelect = ({ lat, lng, address, city, state, pincode }) => {
     setLocation({ coordinates: [lng, lat] });
-    setForm((prev) => ({ ...prev, address: address || "" }));
+    setForm((prev) => ({ ...prev, address, city, state, pincode }));
   };
 
   const handleSubmit = async (e) => {
@@ -49,12 +52,16 @@ export default function NewComplaint() {
       setError("Title and description are required");
       return;
     }
+    if (!location || !form.address) {
+      setError("Please select your location using the button above");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
       await createComplaint({
         ...form,
-        location: location ? { type: "Point", coordinates: location.coordinates } : undefined,
+        location: { type: "Point", coordinates: location.coordinates },
         images,
       });
       navigate("/citizen");
@@ -69,7 +76,19 @@ export default function NewComplaint() {
     <div style={{ maxWidth: 600, margin: "0 auto" }}>
       <h2 style={{ marginBottom: 16 }}>New Complaint</h2>
       {error && (
-        <p style={{ color: "#ef4444", marginBottom: 12, fontSize: 14 }}>{error}</p>
+        <div
+          style={{
+            background: "#450a0a",
+            border: "1px solid #ef444440",
+            borderRadius: 12,
+            padding: "10px 14px",
+            marginBottom: 12,
+            color: "#fca5a5",
+            fontSize: 14,
+          }}
+        >
+          {error}
+        </div>
       )}
       <div className="card">
         <input
@@ -92,13 +111,29 @@ export default function NewComplaint() {
           onChange={(e) => setForm({ ...form, category: e.target.value })}
         />
 
-        <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>
-          Pin your location on the map
+        <p
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#e2e8f0",
+            marginBottom: 10,
+            marginTop: 4,
+          }}
+        >
+          Location
         </p>
         <LocationPicker onSelect={handleLocationSelect} />
 
-        <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8, marginTop: 12 }}>
-          Upload images (max 5)
+        <p
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#e2e8f0",
+            marginBottom: 10,
+            marginTop: 16,
+          }}
+        >
+          Images (max 5)
         </p>
         <input
           type="file"
@@ -116,7 +151,13 @@ export default function NewComplaint() {
 
         <button
           className="btn"
-          style={{ width: "100%", marginTop: 8 }}
+          style={{
+            width: "100%",
+            marginTop: 12,
+            padding: "14px 20px",
+            fontSize: 16,
+            fontWeight: 600,
+          }}
           onClick={handleSubmit}
           disabled={submitting || uploading}
         >
