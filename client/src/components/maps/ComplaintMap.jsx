@@ -1,128 +1,147 @@
-import React from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet";
-import MarkerClusterGroup from "react-leaflet-cluster";
+import React, { useState, useCallback } from "react";
+import { useJsApiLoader, GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
 
-const statusIcons = {
-  pending: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-orange.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-  }),
-  assigned: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-blue.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-  }),
-  in_progress: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-violet.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-  }),
-  resolved: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-green.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-  }),
+const containerStyle = { width: "100%", height: "100%" };
+const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+
+const statusColors = {
+  pending: "#fb923c",
+  assigned: "#3b82f6",
+  in_progress: "#a855f7",
+  verification: "#f59e0b",
+  resolved: "#22c55e",
+  rejected: "#ef4444",
+  reopened: "#ec4899",
 };
 
-const defaultIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
+function createIcon(color) {
+  return {
+    path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeWeight: 2,
+    scale: 1.5,
+    anchor: new window.google.maps.Point(12, 22),
+    labelOrigin: new window.google.maps.Point(12, 12),
+  };
+}
 
 export default function ComplaintMap({ complaints = [], height = 500 }) {
-  const hasComplaints = complaints.some(
-    (c) => c.location && c.location.coordinates && c.location.coordinates[0] !== 0
-  );
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: apiKey,
+  });
+
+  const [selected, setSelected] = useState(null);
+  const [mapRef, setMapRef] = useState(null);
 
   const validComplaints = complaints.filter(
     (c) => c.location && c.location.coordinates && c.location.coordinates[0] !== 0
   );
 
+  const mapCenter = validComplaints.length > 0
+    ? { lat: validComplaints[0].location.coordinates[1], lng: validComplaints[0].location.coordinates[0] }
+    : { lat: 20.5937, lng: 78.9629 };
+
+  const onLoad = useCallback((map) => {
+    setMapRef(map);
+    if (validComplaints.length > 1 && map) {
+      const bounds = new window.google.maps.LatLngBounds();
+      validComplaints.forEach((c) =>
+        bounds.extend({ lat: c.location.coordinates[1], lng: c.location.coordinates[0] })
+      );
+      map.fitBounds(bounds);
+    }
+  }, [validComplaints]);
+
+  if (loadError) {
+    return (
+      <div
+        style={{
+          height, borderRadius: 12,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "#0f172a", color: "#ef4444", fontSize: 14,
+        }}
+      >
+        Google Maps failed to load. Check your API key.
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div
+        style={{
+          height, borderRadius: 12,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "#0f172a", color: "#94a3b8", fontSize: 14,
+        }}
+      >
+        Loading map...
+      </div>
+    );
+  }
+
   return (
     <div style={{ height, borderRadius: 12, overflow: "hidden" }}>
-      <MapContainer
-        center={[20.5937, 78.9629]}
-        zoom={5}
-        style={{ height: "100%", width: "100%" }}
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={mapCenter}
+        zoom={validComplaints.length > 0 ? 12 : 5}
+        onLoad={onLoad}
+        options={{ streetViewControl: false, mapTypeControl: false }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {hasComplaints && (
-          <MarkerClusterGroup chunkedLoading>
-            {validComplaints.map((c) => (
-              <Marker
-                key={c._id || c.complaintId}
-                position={[c.location.coordinates[1], c.location.coordinates[0]]}
-                icon={statusIcons[c.status] || defaultIcon}
+        {validComplaints.map((c) => (
+          <Marker
+            key={c._id || c.complaintId}
+            position={{ lat: c.location.coordinates[1], lng: c.location.coordinates[0] }}
+            icon={createIcon(statusColors[c.status] || "#94a3b8")}
+            onClick={() => setSelected(c)}
+          />
+        ))}
+        {selected && (
+          <InfoWindow
+            position={{
+              lat: selected.location.coordinates[1],
+              lng: selected.location.coordinates[0],
+            }}
+            onCloseClick={() => setSelected(null)}
+          >
+            <div style={{ fontFamily: "Segoe UI", fontSize: 13, color: "#333", minWidth: 180 }}>
+              <strong>{selected.complaintId}</strong>
+              <br />
+              {selected.title}
+              <br />
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  borderRadius: 10,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  marginTop: 4,
+                  background: `${(statusColors[selected.status] || "#94a3b8")}20`,
+                  color: statusColors[selected.status] || "#94a3b8",
+                }}
               >
-                <Popup>
-                  <div style={{ fontFamily: "Segoe UI", fontSize: 13, color: "#333", minWidth: 180 }}>
-                    <strong>{c.complaintId}</strong>
-                    <br />
-                    {c.title}
-                    <br />
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        marginTop: 4,
-                        background:
-                          c.status === "resolved"
-                            ? "#22c55e20"
-                            : c.status === "assigned"
-                              ? "#3b82f620"
-                              : c.status === "in_progress"
-                                ? "#a855f720"
-                                : "#fb923c20",
-                        color:
-                          c.status === "resolved"
-                            ? "#22c55e"
-                            : c.status === "assigned"
-                              ? "#3b82f6"
-                              : c.status === "in_progress"
-                                ? "#a855f7"
-                                : "#fb923c",
-                      }}
-                    >
-                      {c.status?.toUpperCase()}
-                    </span>
-                    <br />
-                    <span style={{ color: "#666", fontSize: 11 }}>
-                      Priority: {c.priority?.toUpperCase()} · {c.department?.name || "No Dept"}
-                    </span>
-                    {c.address && (
-                      <>
-                        <br />
-                        <span style={{ color: "#666", fontSize: 11 }}>
-                          {c.address.substring(0, 60)}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MarkerClusterGroup>
+                {selected.status?.toUpperCase()}
+              </span>
+              <br />
+              <span style={{ color: "#666", fontSize: 11 }}>
+                Priority: {selected.priority?.toUpperCase()} · {selected.department?.name || "No Dept"}
+              </span>
+              {selected.address && (
+                <>
+                  <br />
+                  <span style={{ color: "#666", fontSize: 11 }}>
+                    {selected.address.substring(0, 60)}
+                  </span>
+                </>
+              )}
+            </div>
+          </InfoWindow>
         )}
-      </MapContainer>
+      </GoogleMap>
     </div>
   );
 }

@@ -1,21 +1,9 @@
-import React, { useState, useRef, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
-import L from "leaflet";
-import { reverseGeocode, searchLocation } from "../../services/complaintService";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useJsApiLoader, GoogleMap, Marker } from "@react-google-maps/api";
 
-const icon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-
-function MapController({ center, zoom }) {
-  const map = useMap();
-  if (center) map.setView(center, zoom || 15);
-  return null;
-}
+const containerStyle = { width: "100%", height: 250, borderRadius: 12 };
+const libs = ["places"];
+const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
 const styles = {
   btnCurrent: {
@@ -35,7 +23,7 @@ const styles = {
     marginBottom: 12,
     touchAction: "manipulation",
   },
-  btnCurrentDisabled: {
+  btnDisabled: {
     width: "100%",
     padding: "14px 20px",
     fontSize: 16,
@@ -81,78 +69,83 @@ const styles = {
     margin: "2px 0",
     lineHeight: 1.5,
   },
-  previewLabel: {
-    fontSize: 11,
-    color: "#64748b",
-    marginRight: 4,
-  },
   coords: {
     fontSize: 12,
     color: "#94a3b8",
     marginTop: 4,
   },
-  searching: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  fetchingAddr: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: 8,
-    marginBottom: 4,
-  },
+  searching: { fontSize: 12, color: "#94a3b8", marginTop: -4, marginBottom: 8 },
+  fetchingAddr: { fontSize: 12, color: "#94a3b8", marginTop: 8, marginBottom: 4 },
 };
 
 export default function LocationPicker({ onSelect }) {
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: apiKey,
+    libraries: libs,
+  });
+
   const [position, setPosition] = useState(null);
-  const [addressData, setAddressData] = useState(null);
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [pincode, setPincode] = useState("");
   const [fetching, setFetching] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [center, setCenter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  const [predictions, setPredictions] = useState([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const mapRef = useRef(null);
   const debounceRef = useRef(null);
+  const geocoderRef = useRef(null);
 
-  const emitSelect = useCallback((latlng, addrData) => {
-    const d = addrData || {};
+  useEffect(() => {
+    if (isLoaded && !geocoderRef.current) {
+      geocoderRef.current = new window.google.maps.Geocoder();
+    }
+  }, [isLoaded]);
+
+  const emitSelect = useCallback((lat, lng, addr, c, s, p) => {
+    const cityVal = c || "";
+    const stateVal = s || "";
+    const pincodeVal = p || "";
+    setAddress(addr);
+    setCity(cityVal);
+    setState(stateVal);
+    setPincode(pincodeVal);
     onSelect({
-      lat: latlng.lat,
-      lng: latlng.lng,
-      address: d.displayName || `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`,
-      city: d.address?.city || "",
-      state: d.address?.state || "",
-      pincode: d.address?.postcode || "",
-      addressDetails: d.address || {},
+      lat, lng, address: addr,
+      city: cityVal, state: stateVal, pincode: pincodeVal,
     });
   }, [onSelect]);
 
-  const doReverseGeocode = useCallback(async (latlng) => {
+  const doReverseGeocode = useCallback((lat, lng) => {
+    if (!geocoderRef.current) return;
     setFetching(true);
-    try {
-      const { data } = await reverseGeocode(latlng.lat, latlng.lng);
-      const addrData = {
-        displayName: data.displayName,
-        address: data.address || {},
-      };
-      setAddressData(addrData);
-      emitSelect(latlng, addrData);
-    } catch {
-      const fallback = { displayName: `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`, address: {} };
-      setAddressData(fallback);
-      emitSelect(latlng, fallback);
-    } finally {
+    geocoderRef.current.geocode({ location: { lat, lng } }, (results, status) => {
       setFetching(false);
-    }
+      if (status === "OK" && results[0]) {
+        const addr = results[0].formatted_address;
+        let c = "", s = "", p = "";
+        for (const comp of results[0].address_components) {
+          if (comp.types.includes("locality")) c = comp.long_name;
+          else if (comp.types.includes("sublocality") && !c) c = comp.long_name;
+          if (comp.types.includes("administrative_area_level_1")) s = comp.long_name;
+          if (comp.types.includes("postal_code")) p = comp.long_name;
+        }
+        emitSelect(lat, lng, addr, c, s, p);
+      } else {
+        emitSelect(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`, "", "", "");
+      }
+    });
   }, [emitSelect]);
 
-  const placeMarker = useCallback((latlng) => {
-    setPosition(latlng);
-    setCenter(latlng);
-    doReverseGeocode(latlng);
+  const placeMarker = useCallback((lat, lng) => {
+    const ll = { lat, lng };
+    setPosition(ll);
+    setCenter(ll);
+    if (mapRef.current) mapRef.current.panTo(ll);
+    doReverseGeocode(lat, lng);
   }, [doReverseGeocode]);
 
   const handleLocateMe = () => {
@@ -164,7 +157,7 @@ export default function LocationPicker({ onSelect }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setGettingLocation(false);
-        placeMarker(L.latLng(pos.coords.latitude, pos.coords.longitude));
+        placeMarker(pos.coords.latitude, pos.coords.longitude);
       },
       () => {
         setGettingLocation(false);
@@ -179,58 +172,74 @@ export default function LocationPicker({ onSelect }) {
     setSearchQuery(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!q.trim()) {
-      setSearchResults([]);
-      setShowResults(false);
+      setPredictions([]);
+      setShowPredictions(false);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const { data } = await searchLocation(q);
-        setSearchResults(data);
-        setShowResults(true);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
+    debounceRef.current = setTimeout(() => {
+      if (!window.google?.maps?.places?.AutocompleteService) return;
+      const service = new window.google.maps.places.AutocompleteService();
+      service.getPlacePredictions(
+        { input: q, types: ["geocode", "establishment"] },
+        (preds, status) => {
+          if (status === "OK" && preds) {
+            setPredictions(preds);
+            setShowPredictions(true);
+          }
+        }
+      );
     }, 500);
   };
 
-  const handleSelectResult = (result) => {
-    const latlng = L.latLng(result.lat, result.lng);
-    setPosition(latlng);
-    setCenter(latlng);
-    setSearchQuery(result.displayName?.split(",")[0] || result.displayName);
-    setShowResults(false);
-    const addrData = { displayName: result.displayName, address: result.address || {} };
-    setAddressData(addrData);
-    emitSelect(latlng, addrData);
+  const handleSelectPrediction = (prediction) => {
+    setSearchQuery(prediction.description);
+    setShowPredictions(false);
+    if (!geocoderRef.current) return;
+    geocoderRef.current.geocode({ placeId: prediction.place_id }, (results, status) => {
+      if (status === "OK" && results[0]) {
+        const loc = results[0].geometry.location;
+        placeMarker(loc.lat(), loc.lng());
+      }
+    });
   };
 
   const handleDragEnd = (e) => {
-    const latlng = e.target.getLatLng();
-    setPosition(latlng);
-    doReverseGeocode(latlng);
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    setPosition({ lat, lng });
+    doReverseGeocode(lat, lng);
   };
 
-  function ClickHandler() {
-    useMapEvents({
-      click(e) { placeMarker(e.latlng); },
-    });
-    return null;
+  const handleMapLoad = (map) => {
+    mapRef.current = map;
+  };
+
+  const handleMapClick = (e) => {
+    placeMarker(e.latLng.lat(), e.latLng.lng());
+  };
+
+  const locationPicked = position && address;
+
+  if (loadError) {
+    return (
+      <div style={{ color: "#ef4444", padding: 16, textAlign: "center", fontSize: 14 }}>
+        Google Maps failed to load. Check your API key and try again.
+      </div>
+    );
   }
 
-  const displayName = addressData?.displayName || "";
-  const city = addressData?.address?.city || "";
-  const state = addressData?.address?.state || "";
-  const pincode = addressData?.address?.postcode || "";
-  const locationPicked = position && displayName;
+  if (!isLoaded) {
+    return (
+      <div style={{ color: "#94a3b8", padding: 16, textAlign: "center", fontSize: 14 }}>
+        Loading Google Maps...
+      </div>
+    );
+  }
 
   return (
     <div>
       <button
-        style={gettingLocation ? styles.btnCurrentDisabled : styles.btnCurrent}
+        style={gettingLocation ? styles.btnDisabled : styles.btnCurrent}
         onClick={handleLocateMe}
         disabled={gettingLocation}
       >
@@ -243,17 +252,14 @@ export default function LocationPicker({ onSelect }) {
           placeholder="🔍 Search location (area, landmark, market...)"
           value={searchQuery}
           onChange={handleSearchInput}
-          onFocus={() => searchResults.length > 0 && setShowResults(true)}
-          onBlur={() => setTimeout(() => setShowResults(false), 200)}
+          onFocus={() => predictions.length > 0 && setShowPredictions(true)}
+          onBlur={() => setTimeout(() => setShowPredictions(false), 200)}
         />
-        {searching && <div style={styles.searching}>Searching...</div>}
-        {showResults && searchResults.length > 0 && (
+        {showPredictions && predictions.length > 0 && (
           <div
             style={{
               position: "absolute",
-              top: "100%",
-              left: 0,
-              right: 0,
+              top: "100%", left: 0, right: 0,
               background: "#1e293b",
               border: "1px solid #334155",
               borderRadius: 12,
@@ -263,20 +269,20 @@ export default function LocationPicker({ onSelect }) {
               marginTop: 4,
             }}
           >
-            {searchResults.map((r, i) => (
+            {predictions.map((p, i) => (
               <div
-                key={i}
+                key={p.place_id}
                 style={{
                   padding: "10px 14px",
                   cursor: "pointer",
                   fontSize: 13,
                   color: "#e2e8f0",
-                  borderBottom: i < searchResults.length - 1 ? "1px solid #334155" : "none",
+                  borderBottom: i < predictions.length - 1 ? "1px solid #334155" : "none",
                   lineHeight: 1.4,
                 }}
-                onMouseDown={() => handleSelectResult(r)}
+                onMouseDown={() => handleSelectPrediction(p)}
               >
-                {r.displayName}
+                {p.description}
               </div>
             ))}
           </div>
@@ -288,7 +294,7 @@ export default function LocationPicker({ onSelect }) {
       {locationPicked && (
         <div style={styles.previewCard}>
           <div style={styles.previewTitle}>📍 Selected Address</div>
-          <div style={styles.previewText}>{displayName}</div>
+          <div style={styles.previewText}>{address}</div>
           {(city || state || pincode) && (
             <div style={styles.previewText}>
               {[city, state, pincode].filter(Boolean).join(", ")}
@@ -303,30 +309,25 @@ export default function LocationPicker({ onSelect }) {
       )}
 
       <div style={{ height: 250, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
-        <MapContainer
-          center={center || [20.5937, 78.9629]}
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={center || { lat: 20.5937, lng: 78.9629 }}
           zoom={center ? 15 : 5}
-          style={{ height: "100%", width: "100%" }}
-          scrollWheelZoom={true}
+          onLoad={handleMapLoad}
+          onClick={handleMapClick}
+          options={{ disableDefaultUI: false, streetViewControl: false }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <ClickHandler />
-          {center && <MapController center={center} zoom={15} />}
           {position && (
             <Marker
               position={position}
-              icon={icon}
               draggable={true}
-              eventHandlers={{ dragend: handleDragEnd }}
+              onDragEnd={handleDragEnd}
             />
           )}
-        </MapContainer>
+        </GoogleMap>
       </div>
       <p style={{ fontSize: 11, color: "#475569", marginTop: 4, textAlign: "center" }}>
-        Pinch to zoom · Drag marker to adjust
+        Drag marker to adjust · Click map to reposition
       </p>
     </div>
   );
