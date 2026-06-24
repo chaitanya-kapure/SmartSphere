@@ -1,11 +1,14 @@
-require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const mongoose = require("mongoose");
 const config = require("../src/config/env");
 const User = require("../src/models/User");
 const Department = require("../src/models/Department");
 
 async function migrate() {
-  await mongoose.connect(config.mongoUri);
+  if (!config.mongodbUri) {
+    console.error("MONGODB_URI is not set. Check .env file.");
+    process.exit(1);
+  }
+  await mongoose.connect(config.mongodbUri);
   console.log("Connected to MongoDB");
 
   const GEN = await Department.findOne({ code: "GEN" });
