@@ -26,6 +26,13 @@ const registerRules = [
     .optional()
     .isIn(["citizen", "worker", "dept_head", "super_admin"])
     .withMessage("Role must be one of: citizen, worker, dept_head, super_admin"),
+
+  body("department")
+    .if((value, { req }) => req.body.role === "dept_head" || req.body.role === "worker")
+    .notEmpty()
+    .withMessage("Department is required for this role")
+    .isMongoId()
+    .withMessage("Invalid department ID"),
 ];
 
 const loginRules = [

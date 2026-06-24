@@ -8,10 +8,22 @@ const { AppError } = require("../utils/errors");
 const SALT_ROUNDS = 12;
 
 class AuthService {
-  async register({ name, email, password, role }) {
+  async register({ name, email, password, role, department }) {
     const existing = await User.findOne({ email });
     if (existing) {
       throw new AppError("Email already registered", 409);
+    }
+
+    const resolvedRole = role || "citizen";
+
+    if (["dept_head", "worker"].includes(resolvedRole)) {
+      if (!department) {
+        throw new AppError("Department is required for this role", 400);
+      }
+      const deptExists = await require("../models/Department").findById(department);
+      if (!deptExists) {
+        throw new AppError("Department not found", 404);
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -20,7 +32,8 @@ class AuthService {
       name,
       email,
       passwordHash,
-      role: role || "citizen",
+      role: resolvedRole,
+      department: department || null,
     });
 
     const accessToken = this._generateAccessToken(user);

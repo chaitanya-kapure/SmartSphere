@@ -3,8 +3,8 @@ const { AppError } = require("../utils/errors");
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
-    const result = await authService.register({ name, email, password, role });
+    const { name, email, password, role, department } = req.body;
+    const result = await authService.register({ name, email, password, role, department });
     res.status(201).json(result);
   } catch (err) {
     next(err);

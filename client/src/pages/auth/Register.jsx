@@ -1,19 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import api from "../../api/axios";
 
 export default function Register() {
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "citizen" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "citizen", department: "" });
+  const [departments, setDepartments] = useState([]);
   const [error, setError] = useState("");
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get("/departments").then(({ data }) => setDepartments(data.data || [])).catch(() => {});
+  }, []);
+
+  const showDepartment = form.role === "dept_head" || form.role === "worker";
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = await register(form.name, form.email, form.password, form.role);
+      const user = await register(
+        form.name,
+        form.email,
+        form.password,
+        form.role,
+        showDepartment ? form.department : undefined
+      );
       const route =
         user.role === "citizen"
           ? "/citizen"
@@ -71,6 +85,21 @@ export default function Register() {
             <option value="dept_head">Department Head</option>
             <option value="super_admin">Super Admin</option>
           </select>
+          {showDepartment && (
+            <select
+              className="input"
+              name="department"
+              value={form.department}
+              onChange={handleChange}
+            >
+              <option value="">Select Department</option>
+              {departments.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button type="submit" className="btn" style={{ width: "100%" }}>
             Register
           </button>

@@ -25,12 +25,13 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const register = async (name, email, password, role) => {
+  const register = async (name, email, password, role, department) => {
     const { data } = await api.post("/auth/register", {
       name,
       email,
       password,
       role,
+      department,
     });
     localStorage.setItem("accessToken", data.accessToken);
     localStorage.setItem("refreshToken", data.refreshToken);
