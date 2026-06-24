@@ -275,11 +275,19 @@ class ComplaintService {
     this._validateTransition(complaint.status, newStatus);
 
     const previousStatus = complaint.status;
-    complaint.status = newStatus;
 
-    if (proofImages && proofImages.length > 0) {
+    if (newStatus === "verification") {
+      if (!proofImages || proofImages.length === 0) {
+        throw new AppError("Proof image is required before marking complete", 400);
+      }
+      complaint.proofImages = proofImages;
+      complaint.completedAt = new Date();
+      complaint.completedBy = user.id;
+    } else if (proofImages && proofImages.length > 0) {
       complaint.proofImages = proofImages;
     }
+
+    complaint.status = newStatus;
 
     if (newStatus === "resolved") {
       complaint.resolvedAt = new Date();
@@ -327,6 +335,122 @@ class ComplaintService {
         type: "feedback_request",
         title: "Complaint Resolved — Share Feedback",
         message: `Your complaint ${complaint.complaintId} has been resolved. Please rate your experience.`,
+        complaint: complaint._id,
+      });
+    }
+
+    return complaint;
+  }
+
+  async approve(user, complaintId) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    if (complaint.status !== "verification") {
+      throw new AppError("Complaint must be in verification status to approve", 400);
+    }
+
+    this._checkDeptAccess(user, complaint);
+
+    complaint.status = "resolved";
+    complaint.verifiedAt = new Date();
+    complaint.verifiedBy = user.id;
+    complaint.resolvedAt = new Date();
+    const diffMs = complaint.resolvedAt - complaint.createdAt;
+    complaint.resolutionTimeHours = Math.round(diffMs / (1000 * 60 * 60));
+    await complaint.save();
+
+    await this._recordHistory(
+      complaint._id,
+      "verification",
+      "resolved",
+      user.id,
+      "Approved by department head"
+    );
+
+    try {
+      const io = getIO();
+      io.to(`user:${complaint.citizen}`).emit("status_changed", {
+        complaintId: complaint.complaintId,
+        previousStatus: "verification",
+        newStatus: "resolved",
+      });
+      if (complaint.assignedWorker) {
+        io.to(`user:${complaint.assignedWorker}`).emit("notification", {
+          type: "verification_approved",
+          complaintId: complaint.complaintId,
+        });
+      }
+    } catch {}
+
+    await notificationService.create({
+      recipient: complaint.citizen,
+      type: "feedback_request",
+      title: "Complaint Resolved",
+      message: `Your complaint ${complaint.complaintId} has been verified and resolved.`,
+      complaint: complaint._id,
+    });
+
+    if (complaint.assignedWorker) {
+      await notificationService.create({
+        recipient: complaint.assignedWorker,
+        type: "verification_approved",
+        title: "Work Approved",
+        message: `Your work on complaint ${complaint.complaintId} has been approved.`,
+        complaint: complaint._id,
+      });
+    }
+
+    return complaint;
+  }
+
+  async reject(user, complaintId, remark) {
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint || complaint.isDeleted) {
+      throw new AppError("Complaint not found", 404);
+    }
+
+    if (complaint.status !== "verification") {
+      throw new AppError("Complaint must be in verification status to reject", 400);
+    }
+
+    this._checkDeptAccess(user, complaint);
+
+    if (!remark || !remark.trim()) {
+      throw new AppError("Remark is required when rejecting", 400);
+    }
+
+    complaint.status = "in_progress";
+    complaint.rejectionRemark = remark.trim();
+    complaint.rejectedAt = new Date();
+    complaint.rejectedBy = user.id;
+    await complaint.save();
+
+    await this._recordHistory(
+      complaint._id,
+      "verification",
+      "in_progress",
+      user.id,
+      `Rejected: ${remark}`
+    );
+
+    if (complaint.assignedWorker) {
+      try {
+        const io = getIO();
+        io.to(`user:${complaint.assignedWorker}`).emit("notification", {
+          type: "verification_rejected",
+          complaintId: complaint.complaintId,
+          remark,
+        });
+      } catch {}
+
+      await notificationService.create({
+        recipient: complaint.assignedWorker,
+        type: "verification_rejected",
+        title: "Work Rejected — Needs Revision",
+        message: `Your work on complaint ${complaint.complaintId} was rejected: ${remark}`,
         complaint: complaint._id,
       });
     }
@@ -402,6 +526,16 @@ class ComplaintService {
     if (user.role === "super_admin") return;
     if (complaint.citizen.toString() === user.id) return;
     throw new AppError("You can only modify your own complaints", 403);
+  }
+
+  _checkDeptAccess(user, complaint) {
+    if (user.role === "super_admin") return;
+    if (user.role === "dept_head" && user.department) {
+      if (complaint.department && complaint.department.toString() === user.department) {
+        return;
+      }
+    }
+    throw new AppError("You do not have permission to verify this complaint", 403);
   }
 }
 

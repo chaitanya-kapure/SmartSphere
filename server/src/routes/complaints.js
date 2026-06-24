@@ -6,6 +6,7 @@ const {
   createComplaintRules,
   updateStatusRules,
   assignRules,
+  rejectRules,
   complaintIdRule,
 } = require("../validators/complaintValidators");
 const ctrl = require("../controllers/complaintController");
@@ -51,6 +52,25 @@ router.post(
   updateStatusRules,
   validate,
   ctrl.updateStatus
+);
+
+router.post(
+  "/:id/approve",
+  authenticate,
+  authorize("dept_head", "super_admin"),
+  complaintIdRule,
+  validate,
+  ctrl.approve
+);
+
+router.post(
+  "/:id/reject",
+  authenticate,
+  authorize("dept_head", "super_admin"),
+  complaintIdRule,
+  rejectRules,
+  validate,
+  ctrl.reject
 );
 
 router.get(

@@ -15,6 +15,8 @@ const notificationSchema = new mongoose.Schema(
           "status_change",
           "feedback_request",
           "complaint_update",
+          "verification_approved",
+          "verification_rejected",
         ],
         message: "{VALUE} is not a valid notification type",
       },

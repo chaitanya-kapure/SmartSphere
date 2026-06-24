@@ -66,6 +66,15 @@ const assignRules = [
     .withMessage("Invalid worker ID"),
 ];
 
+const rejectRules = [
+  body("remark")
+    .notEmpty()
+    .withMessage("Remark is required when rejecting")
+    .trim()
+    .isLength({ min: 5, max: 500 })
+    .withMessage("Remark must be 5–500 characters"),
+];
+
 const complaintIdRule = [
   param("id").isMongoId().withMessage("Invalid complaint ID"),
 ];
@@ -74,5 +83,6 @@ module.exports = {
   createComplaintRules,
   updateStatusRules,
   assignRules,
+  rejectRules,
   complaintIdRule,
 };

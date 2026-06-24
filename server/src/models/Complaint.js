@@ -92,6 +92,13 @@ const complaintSchema = new mongoose.Schema(
         message: "Maximum 5 proof images allowed",
       },
     },
+    completedAt: { type: Date, default: null },
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    verifiedAt: { type: Date, default: null },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    rejectionRemark: { type: String, default: null, trim: true, maxlength: 500 },
+    rejectedAt: { type: Date, default: null },
+    rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     status: {
       type: String,
       enum: {

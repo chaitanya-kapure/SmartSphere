@@ -77,6 +77,24 @@ exports.updateStatus = async (req, res, next) => {
   }
 };
 
+exports.approve = async (req, res, next) => {
+  try {
+    const complaint = await complaintService.approve(req.user, req.params.id);
+    res.json(complaint);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.reject = async (req, res, next) => {
+  try {
+    const complaint = await complaintService.reject(req.user, req.params.id, req.body.remark);
+    res.json(complaint);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.timeline = async (req, res, next) => {
   try {
     const history = await complaintService.timeline(req.params.id);

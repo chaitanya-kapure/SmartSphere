@@ -127,6 +127,7 @@ export default function WorkerDashboard() {
               display: "flex",
               gap: 10,
               alignItems: "center",
+              flexWrap: "wrap",
             }}
           >
             {(t.status === "assigned" || t.status === "in_progress") && (
@@ -146,12 +147,29 @@ export default function WorkerDashboard() {
                   </span>
                 )}
                 {proofs[t._id]?.length > 0 && (
-                  <span style={{ fontSize: 12, color: "#22c55e" }}>
-                    {proofs[t._id].length} uploaded
-                  </span>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    {proofs[t._id].map((img, i) => (
+                      <img
+                        key={i}
+                        src={img.url}
+                        alt="proof"
+                        style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4 }}
+                      />
+                    ))}
+                  </div>
                 )}
+                {nextStatus(t.status) === "verification" &&
+                  (!proofs[t._id] || proofs[t._id].length === 0) && (
+                    <span style={{ fontSize: 12, color: "#ef4444" }}>
+                      Proof image is required.
+                    </span>
+                  )}
                 <button
                   className="btn btn-sm"
+                  disabled={
+                    (nextStatus(t.status) === "verification" &&
+                      (!proofs[t._id] || proofs[t._id].length === 0))
+                  }
                   onClick={() =>
                     handleStatusUpdate(t._id, nextStatus(t.status))
                   }
@@ -159,9 +177,14 @@ export default function WorkerDashboard() {
                   Mark{" "}
                   {nextStatus(t.status) === "in_progress"
                     ? "In Progress"
-                    : "Verification"}
+                    : "Complete"}
                 </button>
               </>
+            )}
+            {t.status === "rejected" && t.rejectionRemark && (
+              <p style={{ fontSize: 12, color: "#ef4444", margin: 0 }}>
+                Rejected: {t.rejectionRemark}
+              </p>
             )}
           </div>
         </div>

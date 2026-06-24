@@ -7,6 +7,10 @@ export const assignWorker = (id, workerId) =>
   api.post(`/complaints/${id}/assign`, { workerId });
 export const updateStatus = (id, data) =>
   api.post(`/complaints/${id}/status`, data);
+export const approveComplaint = (id) =>
+  api.post(`/complaints/${id}/approve`);
+export const rejectComplaint = (id, remark) =>
+  api.post(`/complaints/${id}/reject`, { remark });
 export const getTimeline = (id) => api.get(`/complaints/${id}/timeline`);
 
 export const getMapComplaints = (params) =>
