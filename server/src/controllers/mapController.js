@@ -3,6 +3,27 @@ const User = require("../models/User");
 const { AppError } = require("../utils/errors");
 const https = require("https");
 
+function fetchJSON(url, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { "User-Agent": "SmartSphereCity/2.0" } }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          reject(new Error("Invalid JSON response"));
+        }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      reject(new Error("Request timeout"));
+    });
+  });
+}
+
 exports.getComplaints = async (req, res, next) => {
   try {
     const filter = { isDeleted: false, "location.coordinates.0": { $ne: 0 } };
@@ -108,15 +129,41 @@ exports.searchLocation = async (req, res, next) => {
       throw new AppError("Search query is required", 400);
     }
 
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`;
+    const query = encodeURIComponent(q.trim());
+    let results = [];
 
-    https.get(url, { headers: { "User-Agent": "SmartSphereCity/2.0" } }, (response) => {
-      let data = "";
-      response.on("data", (chunk) => (data += chunk));
-      response.on("end", () => {
-        try {
-          const results = JSON.parse(data);
-          res.json(results.map((r) => ({
+    // Try Photon (OSM-based geocoder, good for POIs/landmarks, no API key needed)
+    try {
+      const photonUrl = `https://photon.komoot.io/api/?q=${query}&limit=8`;
+      const data = await fetchJSON(photonUrl);
+      if (data.features && data.features.length > 0) {
+        results = data.features.map((f) => {
+          const p = f.properties || {};
+          const coords = f.geometry?.coordinates || [0, 0];
+          return {
+            lat: parseFloat(coords[1]),
+            lng: parseFloat(coords[0]),
+            displayName: [p.name, p.city, p.state, p.country].filter(Boolean).join(", "),
+            address: {
+              road: p.street || "",
+              city: p.city || "",
+              state: p.state || "",
+              postcode: p.postcode || "",
+            },
+          };
+        });
+      }
+    } catch {
+      // Photon failed — fall through to Nominatim
+    }
+
+    // Fall back to Nominatim if Photon returned nothing
+    if (results.length === 0) {
+      try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&addressdetails=1`;
+        const data = await fetchJSON(nominatimUrl, 3000);
+        if (Array.isArray(data)) {
+          results = data.map((r) => ({
             lat: parseFloat(r.lat),
             lng: parseFloat(r.lon),
             displayName: r.display_name,
@@ -126,12 +173,14 @@ exports.searchLocation = async (req, res, next) => {
               state: r.address?.state || "",
               postcode: r.address?.postcode || "",
             },
-          })));
-        } catch {
-          res.json([]);
+          }));
         }
-      });
-    });
+      } catch {
+        // Nominatim failed too — return empty
+      }
+    }
+
+    res.json(results);
   } catch (err) {
     next(err);
   }

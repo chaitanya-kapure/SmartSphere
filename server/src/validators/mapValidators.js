@@ -30,4 +30,14 @@ const reverseGeocodeRules = [
     .withMessage("Invalid longitude"),
 ];
 
-module.exports = { nearbyRules, reverseGeocodeRules };
+const searchRules = [
+  query("q")
+    .notEmpty()
+    .withMessage("Search query is required")
+    .isString()
+    .withMessage("Search query must be a string")
+    .isLength({ min: 1, max: 200 })
+    .withMessage("Search query must be 1–200 characters"),
+];
+
+module.exports = { nearbyRules, reverseGeocodeRules, searchRules };
