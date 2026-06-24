@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import Map, { Marker, Popup, NavigationControl } from "react-map-gl/mapbox";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { MAPBOX_TOKEN } from "../../config/mapbox";
+import Map, { Marker, Popup, NavigationControl } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_STYLE } from "../../config/mapbox";
 
 const statusColors = {
   pending: "#fb923c",
@@ -50,27 +50,12 @@ export default function ComplaintMap({ complaints = [], height = 500 }) {
     mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 15 });
   }, [loaded, validComplaints]);
 
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div
-        style={{
-          height, borderRadius: 12,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "#0f172a", color: "#ef4444", fontSize: 14,
-        }}
-      >
-        Mapbox token is missing. Set REACT_APP_MAPBOX_TOKEN in your .env file.
-      </div>
-    );
-  }
-
   return (
     <div style={{ height, borderRadius: 12, overflow: "hidden" }}>
       <Map
         ref={mapRef}
         initialViewState={mapCenter}
-        mapboxAccessToken={MAPBOX_TOKEN}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle={MAP_STYLE}
         onLoad={onMapLoad}
         style={{ width: "100%", height: "100%" }}
       >

@@ -1,12 +1,8 @@
-import mapboxgl from "mapbox-gl";
 import api from "../api/axios";
 
-export const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
-
-// CRA/webpack 5 fix: mapbox-gl v3 requires workerUrl for environments
-// that don't support new Worker(new URL(...)) natively.
-mapboxgl.workerUrl =
-  `https://unpkg.com/mapbox-gl@${mapboxgl.version}/dist/mapbox-gl.js`;
+// Free tile source for MapLibre GL — no API key or billing required.
+// Uses CARTO Positron (light) basemap. Free tier: 500k tile requests/day.
+export const MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
 const cache = new Map();
 const CACHE_TTL = 60000;

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from "react";
-import Map, { Marker, NavigationControl } from "react-map-gl/mapbox";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { MAPBOX_TOKEN, searchLocations, reverseGeocode } from "../../config/mapbox";
+import Map, { Marker, NavigationControl } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_STYLE, searchLocations, reverseGeocode } from "../../config/mapbox";
 
 function Pin({ color = "#3b82f6", size = 28 }) {
   return (
@@ -181,14 +181,6 @@ export default function LocationPicker({ onSelect }) {
 
   const locationPicked = position && address;
 
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div style={{ color: "#ef4444", padding: 16, textAlign: "center", fontSize: 14 }}>
-        Mapbox token is missing. Set REACT_APP_MAPBOX_TOKEN in your .env file.
-      </div>
-    );
-  }
-
   return (
     <div>
       <button
@@ -264,8 +256,7 @@ export default function LocationPicker({ onSelect }) {
         <Map
           {...viewState}
           onMove={(evt) => setViewState(evt.viewState)}
-          mapboxAccessToken={MAPBOX_TOKEN}
-          mapStyle="mapbox://styles/mapbox/streets-v12"
+          mapStyle={MAP_STYLE}
           onClick={handleMapClick}
           style={{ width: "100%", height: "100%" }}
         >
