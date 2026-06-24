@@ -12,7 +12,6 @@ const requiredVars = [
   "EMAIL_PASS",
   "GEMINI_API_KEY",
   "CLIENT_URL",
-  "GOOGLE_MAPS_API_KEY",
 ];
 
 const missing = requiredVars.filter((key) => !process.env[key]);
