@@ -1,3 +1,4 @@
+const path = require("path");
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
@@ -23,6 +24,7 @@ app.use(cors({ origin: config.clientUrl, credentials: true }));
 app.use(mongoSanitize());
 app.use(sanitizeInput);
 app.use(express.json({ limit: "1mb" }));
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.use(requestLogger);
 

@@ -23,7 +23,5 @@ export const uploadImage = (file, endpoint, complaintId) => {
   const formData = new FormData();
   formData.append("image", file);
   if (complaintId) formData.append("complaintId", complaintId);
-  return api.post(`/uploads/${endpoint}`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  return api.post(`/uploads/${endpoint}`, formData);
 };
