@@ -51,6 +51,18 @@ class ComplaintService {
       }
     }
 
+    if (!aiData.department) {
+      const fallback = await require("./departmentClassifier").classifyByKeywords(
+        data.title,
+        data.description
+      );
+      aiData.department = fallback.departmentId;
+      if (!aiData.category) {
+        aiData.category = fallback.category;
+        aiData["aiClassification.category"] = fallback.category;
+      }
+    }
+
     if (priority.status === "fulfilled") {
       aiData["aiClassification.priority"] = priority.value.priority;
       aiData.priority = priority.value.priority;
