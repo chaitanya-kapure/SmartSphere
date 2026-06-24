@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from "react";
-import { useJsApiLoader, GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from "../../config/googleMaps";
-
-const containerStyle = { width: "100%", height: "100%" };
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import Map, { Marker, Popup, NavigationControl } from "react-map-gl/mapbox";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { MAPBOX_TOKEN } from "../../config/mapbox";
 
 const statusColors = {
   pending: "#fb923c",
@@ -14,48 +13,44 @@ const statusColors = {
   reopened: "#ec4899",
 };
 
-function createIcon(color) {
-  return {
-    path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
-    fillColor: color,
-    fillOpacity: 1,
-    strokeColor: "#ffffff",
-    strokeWeight: 2,
-    scale: 1.5,
-    anchor: new window.google.maps.Point(12, 22),
-    labelOrigin: new window.google.maps.Point(12, 12),
-  };
+function Pin({ color = "#94a3b8", size = 24 }) {
+  return (
+    <svg height={size} viewBox="0 0 24 24" style={{ cursor: "pointer", display: "block" }}>
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill={color} stroke="white" strokeWidth="2"/>
+      <circle cx="12" cy="9" r="2.5" fill="white"/>
+    </svg>
+  );
 }
 
 export default function ComplaintMap({ complaints = [], height = 500 }) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
-
+  const mapRef = useRef(null);
   const [selected, setSelected] = useState(null);
-  const [mapRef, setMapRef] = useState(null);
+  const [loaded, setLoaded] = useState(false);
 
   const validComplaints = complaints.filter(
     (c) => c.location && c.location.coordinates && c.location.coordinates[0] !== 0
   );
 
   const mapCenter = validComplaints.length > 0
-    ? { lat: validComplaints[0].location.coordinates[1], lng: validComplaints[0].location.coordinates[0] }
-    : { lat: 20.5937, lng: 78.9629 };
+    ? { latitude: validComplaints[0].location.coordinates[1], longitude: validComplaints[0].location.coordinates[0], zoom: 12 }
+    : { latitude: 20.5937, longitude: 78.9629, zoom: 5 };
 
-  const onLoad = useCallback((map) => {
-    setMapRef(map);
-    if (validComplaints.length > 1 && map) {
-      const bounds = new window.google.maps.LatLngBounds();
-      validComplaints.forEach((c) =>
-        bounds.extend({ lat: c.location.coordinates[1], lng: c.location.coordinates[0] })
-      );
-      map.fitBounds(bounds);
-    }
-  }, [validComplaints]);
+  const onMapLoad = useCallback(() => {
+    setLoaded(true);
+  }, []);
 
-  if (loadError) {
+  useEffect(() => {
+    if (!loaded || !mapRef.current || validComplaints.length < 2) return;
+    const lngs = validComplaints.map((c) => c.location.coordinates[0]);
+    const lats = validComplaints.map((c) => c.location.coordinates[1]);
+    const bounds = [
+      [Math.min(...lngs), Math.min(...lats)],
+      [Math.max(...lngs), Math.max(...lats)],
+    ];
+    mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 15 });
+  }, [loaded, validComplaints]);
+
+  if (!MAPBOX_TOKEN) {
     return (
       <div
         style={{
@@ -64,51 +59,47 @@ export default function ComplaintMap({ complaints = [], height = 500 }) {
           background: "#0f172a", color: "#ef4444", fontSize: 14,
         }}
       >
-        Google Maps failed to load. Check your API key.
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div
-        style={{
-          height, borderRadius: 12,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "#0f172a", color: "#94a3b8", fontSize: 14,
-        }}
-      >
-        Loading map...
+        Mapbox token is missing. Set REACT_APP_MAPBOX_TOKEN in your .env file.
       </div>
     );
   }
 
   return (
     <div style={{ height, borderRadius: 12, overflow: "hidden" }}>
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        center={mapCenter}
-        zoom={validComplaints.length > 0 ? 12 : 5}
-        onLoad={onLoad}
-        options={{ streetViewControl: false, mapTypeControl: false }}
+      <Map
+        ref={mapRef}
+        initialViewState={mapCenter}
+        mapboxAccessToken={MAPBOX_TOKEN}
+        mapStyle="mapbox://styles/mapbox/streets-v12"
+        onLoad={onMapLoad}
+        style={{ width: "100%", height: "100%" }}
       >
+        <NavigationControl position="top-right" />
         {validComplaints.map((c) => (
           <Marker
             key={c._id || c.complaintId}
-            position={{ lat: c.location.coordinates[1], lng: c.location.coordinates[0] }}
-            icon={createIcon(statusColors[c.status] || "#94a3b8")}
-            onClick={() => setSelected(c)}
-          />
+            latitude={c.location.coordinates[1]}
+            longitude={c.location.coordinates[0]}
+            anchor="bottom"
+            onClick={(e) => {
+              e.originalEvent.stopPropagation();
+              setSelected(c);
+            }}
+          >
+            <Pin color={statusColors[c.status] || "#94a3b8"} />
+          </Marker>
         ))}
         {selected && (
-          <InfoWindow
-            position={{
-              lat: selected.location.coordinates[1],
-              lng: selected.location.coordinates[0],
-            }}
-            onCloseClick={() => setSelected(null)}
+          <Popup
+            latitude={selected.location.coordinates[1]}
+            longitude={selected.location.coordinates[0]}
+            anchor="bottom"
+            onClose={() => setSelected(null)}
+            closeButton={true}
+            closeOnClick={false}
+            style={{ fontFamily: "Segoe UI", fontSize: 13 }}
           >
-            <div style={{ fontFamily: "Segoe UI", fontSize: 13, color: "#333", minWidth: 180 }}>
+            <div style={{ minWidth: 180, color: "#333" }}>
               <strong>{selected.complaintId}</strong>
               <br />
               {selected.title}
@@ -140,9 +131,9 @@ export default function ComplaintMap({ complaints = [], height = 500 }) {
                 </>
               )}
             </div>
-          </InfoWindow>
+          </Popup>
         )}
-      </GoogleMap>
+      </Map>
     </div>
   );
 }

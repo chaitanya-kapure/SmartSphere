@@ -1,8 +1,16 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { useJsApiLoader, GoogleMap, Marker } from "@react-google-maps/api";
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from "../../config/googleMaps";
+import React, { useState, useRef, useCallback } from "react";
+import Map, { Marker, NavigationControl } from "react-map-gl/mapbox";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { MAPBOX_TOKEN, searchLocations, reverseGeocode } from "../../config/mapbox";
 
-const containerStyle = { width: "100%", height: 250, borderRadius: 12 };
+function Pin({ color = "#3b82f6", size = 28 }) {
+  return (
+    <svg height={size} viewBox="0 0 24 24" style={{ cursor: "pointer", display: "block" }}>
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill={color} stroke="white" strokeWidth="2"/>
+      <circle cx="12" cy="9" r="2.5" fill="white"/>
+    </svg>
+  );
+}
 
 const styles = {
   btnCurrent: {
@@ -56,53 +64,27 @@ const styles = {
     padding: "12px 16px",
     marginBottom: 12,
   },
-  previewTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#22c55e",
-    marginBottom: 6,
-  },
-  previewText: {
-    fontSize: 13,
-    color: "#cbd5e1",
-    margin: "2px 0",
-    lineHeight: 1.5,
-  },
-  coords: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: 4,
-  },
-  searching: { fontSize: 12, color: "#94a3b8", marginTop: -4, marginBottom: 8 },
+  previewTitle: { fontSize: 13, fontWeight: 600, color: "#22c55e", marginBottom: 6 },
+  previewText: { fontSize: 13, color: "#cbd5e1", margin: "2px 0", lineHeight: 1.5 },
+  coords: { fontSize: 12, color: "#94a3b8", marginTop: 4 },
   fetchingAddr: { fontSize: 12, color: "#94a3b8", marginTop: 8, marginBottom: 4 },
+  mapHint: { fontSize: 11, color: "#475569", marginTop: 4, textAlign: "center" },
 };
 
 export default function LocationPicker({ onSelect }) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
-
   const [position, setPosition] = useState(null);
+  const [viewState, setViewState] = useState({ latitude: 20.5937, longitude: 78.9629, zoom: 5 });
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
   const [fetching, setFetching] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [center, setCenter] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [predictions, setPredictions] = useState([]);
   const [showPredictions, setShowPredictions] = useState(false);
-  const mapRef = useRef(null);
+  const [searching, setSearching] = useState(false);
   const debounceRef = useRef(null);
-  const geocoderRef = useRef(null);
-
-  useEffect(() => {
-    if (isLoaded && !geocoderRef.current) {
-      geocoderRef.current = new window.google.maps.Geocoder();
-    }
-  }, [isLoaded]);
 
   const emitSelect = useCallback((lat, lng, addr, c, s, p) => {
     const cityVal = c || "";
@@ -112,38 +94,28 @@ export default function LocationPicker({ onSelect }) {
     setCity(cityVal);
     setState(stateVal);
     setPincode(pincodeVal);
-    onSelect({
-      lat, lng, address: addr,
-      city: cityVal, state: stateVal, pincode: pincodeVal,
-    });
+    onSelect({ lat, lng, address: addr, city: cityVal, state: stateVal, pincode: pincodeVal });
   }, [onSelect]);
 
-  const doReverseGeocode = useCallback((lat, lng) => {
-    if (!geocoderRef.current) return;
+  const doReverseGeocode = useCallback(async (lat, lng) => {
     setFetching(true);
-    geocoderRef.current.geocode({ location: { lat, lng } }, (results, status) => {
-      setFetching(false);
-      if (status === "OK" && results[0]) {
-        const addr = results[0].formatted_address;
-        let c = "", s = "", p = "";
-        for (const comp of results[0].address_components) {
-          if (comp.types.includes("locality")) c = comp.long_name;
-          else if (comp.types.includes("sublocality") && !c) c = comp.long_name;
-          if (comp.types.includes("administrative_area_level_1")) s = comp.long_name;
-          if (comp.types.includes("postal_code")) p = comp.long_name;
-        }
-        emitSelect(lat, lng, addr, c, s, p);
+    try {
+      const result = await reverseGeocode(lng, lat);
+      if (result) {
+        emitSelect(lat, lng, result.placeName, result.city, result.state, result.pincode);
       } else {
         emitSelect(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`, "", "", "");
       }
-    });
+    } catch {
+      emitSelect(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`, "", "", "");
+    } finally {
+      setFetching(false);
+    }
   }, [emitSelect]);
 
   const placeMarker = useCallback((lat, lng) => {
-    const ll = { lat, lng };
-    setPosition(ll);
-    setCenter(ll);
-    if (mapRef.current) mapRef.current.panTo(ll);
+    setPosition({ lat, lng });
+    setViewState((prev) => ({ ...prev, latitude: lat, longitude: lng, zoom: 15 }));
     doReverseGeocode(lat, lng);
   }, [doReverseGeocode]);
 
@@ -175,62 +147,44 @@ export default function LocationPicker({ onSelect }) {
       setShowPredictions(false);
       return;
     }
-    debounceRef.current = setTimeout(() => {
-      if (!window.google?.maps?.places?.AutocompleteService) return;
-      const service = new window.google.maps.places.AutocompleteService();
-      service.getPlacePredictions(
-        { input: q, types: ["geocode", "establishment"] },
-        (preds, status) => {
-          if (status === "OK" && preds) {
-            setPredictions(preds);
-            setShowPredictions(true);
-          }
-        }
-      );
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await searchLocations(q);
+        setPredictions(results);
+        setShowPredictions(true);
+      } catch {
+        setPredictions([]);
+      } finally {
+        setSearching(false);
+      }
     }, 500);
   };
 
   const handleSelectPrediction = (prediction) => {
-    setSearchQuery(prediction.description);
+    const [lng, lat] = prediction.center;
+    setSearchQuery(prediction.placeName);
     setShowPredictions(false);
-    if (!geocoderRef.current) return;
-    geocoderRef.current.geocode({ placeId: prediction.place_id }, (results, status) => {
-      if (status === "OK" && results[0]) {
-        const loc = results[0].geometry.location;
-        placeMarker(loc.lat(), loc.lng());
-      }
-    });
+    placeMarker(lat, lng);
   };
 
   const handleDragEnd = (e) => {
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
+    const lat = e.lngLat.lat;
+    const lng = e.lngLat.lng;
     setPosition({ lat, lng });
     doReverseGeocode(lat, lng);
   };
 
-  const handleMapLoad = (map) => {
-    mapRef.current = map;
-  };
-
   const handleMapClick = (e) => {
-    placeMarker(e.latLng.lat(), e.latLng.lng());
+    placeMarker(e.lngLat.lat, e.lngLat.lng);
   };
 
   const locationPicked = position && address;
 
-  if (loadError) {
+  if (!MAPBOX_TOKEN) {
     return (
       <div style={{ color: "#ef4444", padding: 16, textAlign: "center", fontSize: 14 }}>
-        Google Maps failed to load. Check your API key and try again.
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div style={{ color: "#94a3b8", padding: 16, textAlign: "center", fontSize: 14 }}>
-        Loading Google Maps...
+        Mapbox token is missing. Set REACT_APP_MAPBOX_TOKEN in your .env file.
       </div>
     );
   }
@@ -254,6 +208,7 @@ export default function LocationPicker({ onSelect }) {
           onFocus={() => predictions.length > 0 && setShowPredictions(true)}
           onBlur={() => setTimeout(() => setShowPredictions(false), 200)}
         />
+        {searching && <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 4px" }}>Searching...</p>}
         {showPredictions && predictions.length > 0 && (
           <div
             style={{
@@ -270,7 +225,7 @@ export default function LocationPicker({ onSelect }) {
           >
             {predictions.map((p, i) => (
               <div
-                key={p.place_id}
+                key={p.id}
                 style={{
                   padding: "10px 14px",
                   cursor: "pointer",
@@ -281,23 +236,21 @@ export default function LocationPicker({ onSelect }) {
                 }}
                 onMouseDown={() => handleSelectPrediction(p)}
               >
-                {p.description}
+                {p.placeName}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {fetching && <div style={styles.fetchingAddr}>Fetching address...</div>}
+      {fetching && <p style={styles.fetchingAddr}>Fetching address...</p>}
 
       {locationPicked && (
         <div style={styles.previewCard}>
           <div style={styles.previewTitle}>📍 Selected Address</div>
           <div style={styles.previewText}>{address}</div>
           {(city || state || pincode) && (
-            <div style={styles.previewText}>
-              {[city, state, pincode].filter(Boolean).join(", ")}
-            </div>
+            <div style={styles.previewText}>{[city, state, pincode].filter(Boolean).join(", ")}</div>
           )}
           {position && (
             <div style={styles.coords}>
@@ -308,26 +261,23 @@ export default function LocationPicker({ onSelect }) {
       )}
 
       <div style={{ height: 250, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
-        <GoogleMap
-          mapContainerStyle={containerStyle}
-          center={center || { lat: 20.5937, lng: 78.9629 }}
-          zoom={center ? 15 : 5}
-          onLoad={handleMapLoad}
+        <Map
+          {...viewState}
+          onMove={(evt) => setViewState(evt.viewState)}
+          mapboxAccessToken={MAPBOX_TOKEN}
+          mapStyle="mapbox://styles/mapbox/streets-v12"
           onClick={handleMapClick}
-          options={{ disableDefaultUI: false, streetViewControl: false }}
+          style={{ width: "100%", height: "100%" }}
         >
+          <NavigationControl position="top-right" />
           {position && (
-            <Marker
-              position={position}
-              draggable={true}
-              onDragEnd={handleDragEnd}
-            />
+            <Marker latitude={position.lat} longitude={position.lng} anchor="bottom" draggable onDragEnd={handleDragEnd}>
+              <Pin />
+            </Marker>
           )}
-        </GoogleMap>
+        </Map>
       </div>
-      <p style={{ fontSize: 11, color: "#475569", marginTop: 4, textAlign: "center" }}>
-        Drag marker to adjust · Click map to reposition
-      </p>
+      <p style={styles.mapHint}>Drag marker to adjust · Click map to reposition</p>
     </div>
   );
 }
