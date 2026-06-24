@@ -1,6 +1,12 @@
+import mapboxgl from "mapbox-gl";
 import api from "../api/axios";
 
 export const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
+
+// CRA/webpack 5 fix: mapbox-gl v3 requires workerUrl for environments
+// that don't support new Worker(new URL(...)) natively.
+mapboxgl.workerUrl =
+  `https://unpkg.com/mapbox-gl@${mapboxgl.version}/dist/mapbox-gl.js`;
 
 const cache = new Map();
 const CACHE_TTL = 60000;
