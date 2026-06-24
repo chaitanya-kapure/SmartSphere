@@ -107,7 +107,7 @@ export default function WorkerDashboard() {
       <ComplaintMap complaints={tasks} height={350} />
       <h3 style={{ marginTop: 16, marginBottom: 12 }}>My Tasks</h3>
       {tasks.length === 0 && (
-        <p style={{ color: "#94a3b8" }}>No tasks assigned.</p>
+        <p style={{ color: "#64748b" }}>No tasks assigned.</p>
       )}
       {tasks.map((t) => (
         <div key={t._id} className="card">
@@ -117,7 +117,7 @@ export default function WorkerDashboard() {
               {t.status?.toUpperCase()}
             </span>
           </div>
-          <p style={{ marginTop: 6, fontSize: 14, color: "#94a3b8" }}>
+          <p style={{ marginTop: 6, fontSize: 14, color: "#64748b" }}>
             {t.title}
           </p>
 
@@ -151,10 +151,10 @@ export default function WorkerDashboard() {
                     if (e.target.files[0])
                       handleProofUpload(t._id, e.target.files[0]);
                   }}
-                  style={{ fontSize: 12, color: "#94a3b8" }}
+                  style={{ fontSize: 12, color: "#64748b" }}
                 />
                 {uploading[t._id] && (
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>
                     Uploading...
                   </span>
                 )}

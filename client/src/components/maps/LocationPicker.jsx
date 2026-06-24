@@ -37,8 +37,8 @@ const styles = {
     fontWeight: 600,
     border: "none",
     borderRadius: 12,
-    background: "#334155",
-    color: "#64748b",
+    background: "#e2e8f0",
+    color: "#94a3b8",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -50,25 +50,25 @@ const styles = {
     padding: "12px 16px",
     fontSize: 15,
     borderRadius: 12,
-    border: "1px solid #334155",
-    background: "#1e293b",
-    color: "#e2e8f0",
+    border: "1px solid #cbd5e1",
+    background: "#ffffff",
+    color: "#1e293b",
     outline: "none",
     boxSizing: "border-box",
     marginBottom: 8,
   },
   previewCard: {
-    background: "#0f172a",
-    border: "1px solid #334155",
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
     borderRadius: 12,
     padding: "12px 16px",
     marginBottom: 12,
   },
-  previewTitle: { fontSize: 13, fontWeight: 600, color: "#22c55e", marginBottom: 6 },
-  previewText: { fontSize: 13, color: "#cbd5e1", margin: "2px 0", lineHeight: 1.5 },
-  coords: { fontSize: 12, color: "#94a3b8", marginTop: 4 },
-  fetchingAddr: { fontSize: 12, color: "#94a3b8", marginTop: 8, marginBottom: 4 },
-  mapHint: { fontSize: 11, color: "#475569", marginTop: 4, textAlign: "center" },
+  previewTitle: { fontSize: 13, fontWeight: 600, color: "#16a34a", marginBottom: 6 },
+  previewText: { fontSize: 13, color: "#475569", margin: "2px 0", lineHeight: 1.5 },
+  coords: { fontSize: 12, color: "#64748b", marginTop: 4 },
+  fetchingAddr: { fontSize: 12, color: "#64748b", marginTop: 8, marginBottom: 4 },
+  mapHint: { fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "center" },
 };
 
 export default function LocationPicker({ onSelect }) {
@@ -200,19 +200,20 @@ export default function LocationPicker({ onSelect }) {
           onFocus={() => predictions.length > 0 && setShowPredictions(true)}
           onBlur={() => setTimeout(() => setShowPredictions(false), 200)}
         />
-        {searching && <p style={{ fontSize: 12, color: "#94a3b8", margin: "0 0 4px" }}>Searching...</p>}
+        {searching && <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px" }}>Searching...</p>}
         {showPredictions && predictions.length > 0 && (
           <div
             style={{
               position: "absolute",
               top: "100%", left: 0, right: 0,
-              background: "#1e293b",
-              border: "1px solid #334155",
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
               borderRadius: 12,
               maxHeight: 220,
               overflowY: "auto",
               zIndex: 1000,
               marginTop: 4,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
             }}
           >
             {predictions.map((p, i) => (
@@ -222,8 +223,8 @@ export default function LocationPicker({ onSelect }) {
                   padding: "10px 14px",
                   cursor: "pointer",
                   fontSize: 13,
-                  color: "#e2e8f0",
-                  borderBottom: i < predictions.length - 1 ? "1px solid #334155" : "none",
+                  color: "#1e293b",
+                  borderBottom: i < predictions.length - 1 ? "1px solid #e2e8f0" : "none",
                   lineHeight: 1.4,
                 }}
                 onMouseDown={() => handleSelectPrediction(p)}

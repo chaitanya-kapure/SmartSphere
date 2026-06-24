@@ -104,7 +104,7 @@ export default function Register() {
             Register
           </button>
         </form>
-        <p style={{ marginTop: 12, fontSize: 13, color: "#94a3b8" }}>
+        <p style={{ marginTop: 12, fontSize: 13, color: "#64748b" }}>
           Already registered?{" "}
           <Link to="/login" style={{ color: "#6366f1" }}>
             Login

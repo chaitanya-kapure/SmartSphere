@@ -109,12 +109,13 @@ export default function Navbar() {
   return (
     <nav
       style={{
-        background: "#1e293b",
+        background: "#ffffff",
         padding: "12px 24px",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        color: "#e2e8f0",
+        color: "#1e293b",
+        borderBottom: "1px solid #e2e8f0",
       }}
     >
       <Link
@@ -132,7 +133,7 @@ export default function Navbar() {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#e2e8f0",
+                  color: "#1e293b",
                   cursor: "pointer",
                   fontSize: 18,
                   position: "relative",
@@ -175,7 +176,7 @@ export default function Navbar() {
                 />
               )}
             </div>
-            <span style={{ color: "#94a3b8", fontSize: 14 }}>
+            <span style={{ color: "#64748b", fontSize: 14 }}>
               {user.name} ({user.role})
             </span>
             <button

@@ -98,7 +98,7 @@ export default function CitizenDashboard() {
 
       <h3 style={{ marginBottom: 12, marginTop: 16 }}>My Complaints</h3>
       {complaints.length === 0 && (
-        <p style={{ color: "#94a3b8" }}>No complaints yet.</p>
+        <p style={{ color: "#64748b" }}>No complaints yet.</p>
       )}
       {complaints.map((c) => (
         <div key={c._id} className="card">
@@ -108,7 +108,7 @@ export default function CitizenDashboard() {
               {c.status?.toUpperCase()}
             </span>
           </div>
-          <p style={{ marginTop: 6, fontSize: 14, color: "#94a3b8" }}>
+          <p style={{ marginTop: 6, fontSize: 14, color: "#64748b" }}>
             {c.title}
           </p>
         </div>

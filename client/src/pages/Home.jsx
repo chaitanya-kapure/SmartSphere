@@ -10,7 +10,7 @@ export default function Home() {
       <h1 style={{ fontSize: "2.8rem", color: "#6366f1", marginBottom: 10 }}>
         SmartSphere City
       </h1>
-      <p style={{ color: "#94a3b8", marginBottom: 30, fontSize: 16 }}>
+      <p style={{ color: "#64748b", marginBottom: 30, fontSize: 16 }}>
         Smart Urban Complaint Management System
       </p>
       {user ? (

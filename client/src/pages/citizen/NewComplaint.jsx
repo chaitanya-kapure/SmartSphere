@@ -115,7 +115,7 @@ export default function NewComplaint() {
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: "#e2e8f0",
+            color: "#475569",
             marginBottom: 10,
             marginTop: 4,
           }}
@@ -128,7 +128,7 @@ export default function NewComplaint() {
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: "#e2e8f0",
+            color: "#475569",
             marginBottom: 10,
             marginTop: 16,
           }}

@@ -152,7 +152,7 @@ export default function DeptHeadDashboard() {
         Pending Verification
       </h3>
       {verificationTasks.length === 0 && (
-        <p style={{ color: "#94a3b8", marginBottom: 16 }}>
+        <p style={{ color: "#64748b", marginBottom: 16 }}>
           No complaints pending verification.
         </p>
       )}
@@ -165,7 +165,7 @@ export default function DeptHeadDashboard() {
             </span>
           </div>
           <p style={{ marginTop: 4, fontWeight: 600 }}>{c.title}</p>
-          <p style={{ fontSize: 13, color: "#94a3b8" }}>{c.description}</p>
+          <p style={{ fontSize: 13, color: "#64748b" }}>{c.description}</p>
           {c.assignedWorker && (
             <p style={{ fontSize: 12, color: "#64748b" }}>
               Worker: {c.assignedWorker.name} ({c.assignedWorker.email})
@@ -183,7 +183,7 @@ export default function DeptHeadDashboard() {
                   <img
                     src={img.url}
                     alt={`proof ${i + 1}`}
-                    style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 4, border: "1px solid #334155" }}
+                    style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 4, border: "1px solid #cbd5e1" }}
                   />
                 </a>
               ))}
@@ -229,7 +229,7 @@ export default function DeptHeadDashboard() {
               {c.status?.toUpperCase()}
             </span>
           </div>
-          <p style={{ marginTop: 6, fontSize: 14, color: "#94a3b8" }}>
+          <p style={{ marginTop: 6, fontSize: 14, color: "#64748b" }}>
             {c.title}
           </p>
 
