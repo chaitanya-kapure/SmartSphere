@@ -123,11 +123,13 @@ async function classifyByKeywords(title, description) {
     }
   }
 
+  let source = "general";
   let deptName = "General Services Department";
   let deptCode = "GEN";
   let category = "General";
 
   if (bestMatch && bestScore > 0) {
+    source = "keyword";
     deptName = bestMatch.departmentName;
     deptCode = bestMatch.departmentCode;
     category = bestMatch.category;
@@ -142,7 +144,7 @@ async function classifyByKeywords(title, description) {
     });
   }
 
-  return { departmentId: dept._id, category, departmentName: deptName };
+  return { departmentId: dept._id, category, departmentName: deptName, source };
 }
 
 module.exports = { classifyByKeywords };

@@ -10,6 +10,7 @@ const classificationService = require("./ai/classificationService");
 const priorityService = require("./ai/priorityService");
 const duplicateDetectionService = require("./ai/duplicateDetectionService");
 const summarizationService = require("./ai/summarizationService");
+const departmentClassifier = require("./departmentClassifier");
 
 const TRANSITIONS = {
   pending: ["assigned", "rejected"],
@@ -34,10 +35,10 @@ class ComplaintService {
     ]);
 
     const aiData = {};
+    let classifierSource = null;
 
     if (classification.status === "fulfilled") {
       aiData["aiClassification.category"] = classification.value.category;
-      aiData["aiClassification.department"] = classification.value.department;
       aiData["aiClassification.confidence"] = classification.value.confidence;
       aiData.category = classification.value.category;
 
@@ -47,25 +48,28 @@ class ComplaintService {
         }).select("_id");
         if (dept) {
           aiData.department = dept._id;
+          classifierSource = "gemini";
         }
       }
     }
 
-    if (!aiData.department) {
-      const fallback = await require("./departmentClassifier").classifyByKeywords(
+    if (!classifierSource) {
+      const fallback = await departmentClassifier.classifyByKeywords(
         data.title,
         data.description
       );
       aiData.department = fallback.departmentId;
-      if (!aiData.category) {
-        aiData.category = fallback.category;
-        aiData["aiClassification.category"] = fallback.category;
-      }
+      aiData.category = fallback.category;
+      aiData["aiClassification.category"] = fallback.category;
+      classifierSource = fallback.source;
     }
 
     if (priority.status === "fulfilled") {
       aiData["aiClassification.priority"] = priority.value.priority;
       aiData.priority = priority.value.priority;
+    } else {
+      aiData.priority = "medium";
+      aiData["aiClassification.priority"] = "medium";
     }
 
     if (duplicate.status === "fulfilled") {
@@ -98,6 +102,7 @@ class ComplaintService {
       ...(aiData.duplicateOf ? { duplicateOf: aiData.duplicateOf } : {}),
       ...(aiData.aiSummary ? { aiSummary: aiData.aiSummary } : {}),
       aiClassification: {
+        source: classifierSource,
         category: aiData["aiClassification.category"] || null,
         department: aiData["aiClassification.department"] || null,
         priority: aiData["aiClassification.priority"] || null,

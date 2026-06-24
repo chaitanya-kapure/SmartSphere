@@ -117,6 +117,11 @@ const complaintSchema = new mongoose.Schema(
       default: "medium",
     },
     aiClassification: {
+      source: {
+        type: String,
+        enum: { values: ["gemini", "keyword", "general"], message: "Invalid classifier source" },
+        default: null,
+      },
       category: { type: String, default: null },
       department: { type: String, default: null },
       priority: { type: String, default: null },
