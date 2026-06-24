@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from "react";
 import { useJsApiLoader, GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from "../../config/googleMaps";
 
 const containerStyle = { width: "100%", height: "100%" };
-const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
 const statusColors = {
   pending: "#fb923c",
@@ -29,7 +29,8 @@ function createIcon(color) {
 
 export default function ComplaintMap({ complaints = [], height = 500 }) {
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   const [selected, setSelected] = useState(null);

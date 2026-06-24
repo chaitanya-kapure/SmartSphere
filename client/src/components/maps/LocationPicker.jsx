@@ -1,9 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useJsApiLoader, GoogleMap, Marker } from "@react-google-maps/api";
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES } from "../../config/googleMaps";
 
 const containerStyle = { width: "100%", height: 250, borderRadius: 12 };
-const libs = ["places"];
-const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
 const styles = {
   btnCurrent: {
@@ -80,8 +79,8 @@ const styles = {
 
 export default function LocationPicker({ onSelect }) {
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
-    libraries: libs,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   const [position, setPosition] = useState(null);
